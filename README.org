@@ -1,0 +1,11 @@
+* Atomic Bomberman in Rust
+
+* DATA
+** Sounds
+https://twigstechtips.blogspot.com/2011/02/atomic-bomberman-how-to-open-rss-sound.html
+Files are in RSS format (raw sound stream).
+44100Hz PCM signed 16bit, little endian, mono.
+
+#+begin_src bash
+aplay -t raw -c1 -r44100 -fS16_LE ./ADD57A.RSS
+#+end_src
