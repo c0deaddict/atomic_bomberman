@@ -1,11 +1,40 @@
 * Atomic Bomberman in Rust
 
+* Prior art
+https://github.com/HerbFargus/Atomic-Bomberman
+
+* WIP
+** Asset loader for RSS
+** Asset loader for ANI
+** Asset loader for PCX
+
 * DATA
 ** Sounds
+Files are in =/data/DATA/SOUND/=.
+Data is in RSS format (raw sound stream).
+Raw format is: 44100Hz PCM signed 16bit, little endian, mono.
 https://twigstechtips.blogspot.com/2011/02/atomic-bomberman-how-to-open-rss-sound.html
-Files are in RSS format (raw sound stream).
-44100Hz PCM signed 16bit, little endian, mono.
 
 #+begin_src bash
 aplay -t raw -c1 -r44100 -fS16_LE ./ADD57A.RSS
 #+end_src
+
+** Animations
+In directory =/data/DATA/ANI=.
+Extension is =.ANI= with a magic of =CHFILEANI=
+Doesn't seem to be an official format.
+
+https://github.com/mmatyas/ab_aniex/blob/master/src/AniFile.cpp
+https://github.com/mattiz/JBomberman/blob/master/src/main/java/org/moogirc/jbomberman/parsers/AnimationParser.java
+
+** Images
+=/data/DATA/RES=
+in PCX format (https://en.wikipedia.org/wiki/PCX)
+
+Imagemagick can display images:
+#+begin_src bash
+display MAINMENU.PCX
+#+end_src
+
+** Schemes
+Level layout files, are in ASCII readable format.
