@@ -19,6 +19,12 @@ https://twigstechtips.blogspot.com/2011/02/atomic-bomberman-how-to-open-rss-soun
 aplay -t raw -c1 -r44100 -fS16_LE ./ADD57A.RSS
 #+end_src
 
+https://github.com/bevyengine/bevy/blob/master/examples/asset/custom_asset.rs
+
+https://github.com/bevyengine/bevy/blob/dd668c1970cdf555f3fc08861a7781d3c9544d60/crates/bevy_audio/src/audio_source.rs
+convert to wav? rodio is used under the hood, that supports wav.
+https://github.com/RustAudio/rodio/blob/master/src/decoder/mod.rs
+
 ** Animations
 In directory =/data/DATA/ANI=.
 Extension is =.ANI= with a magic of =CHFILEANI=
@@ -35,6 +41,8 @@ Imagemagick can display images:
 #+begin_src bash
 display MAINMENU.PCX
 #+end_src
+
+https://github.com/bevyengine/bevy/blob/acc29ec719814d4814444d26cca023c08307c316/crates/bevy_render/src/texture/image_texture_loader.rs
 
 ** Schemes
 Level layout files, are in ASCII readable format.

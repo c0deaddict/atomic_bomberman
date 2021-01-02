@@ -195,7 +195,9 @@ checksum = "e91831deabf0d6d7ec49552e489aed63b7456a7a3c46cff62adad428110b0af0"
 name = "atomic_bomberman"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bevy",
+ "byteorder",
 ]
 
 [[package]]
@@ -1888,6 +1890,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hound"
+version = "3.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a164bb2ceaeff4f42542bdb847c41517c78a60f5649671b2a07312b6e117549"
+
+[[package]]
 name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2856,6 +2864,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c9683532495146e98878d4948fa1a1953f584cd923f2a5f5c26b7a8701b56943"
 dependencies = [
  "cpal",
+ "hound",
  "minimp3",
 ]
 
