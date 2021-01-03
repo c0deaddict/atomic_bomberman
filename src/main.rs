@@ -15,8 +15,9 @@ fn setup(
     asset_server: Res<AssetServer>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    let texture_handle = asset_server.load("data/RES/MAINMENU.PCX");
-    // let texture_handle = asset_server.load("banner.png");
+    // let texture_handle = asset_server.load("data/RES/MAINMENU.PCX");
+    let texture_handle = asset_server.load("data/ANI/HEADWIPE.ANI");
+    // let texture_handle = asset_server.load("data/ANI/BWALK3.ANI");
     commands
         .spawn(Camera2dBundle::default())
         .spawn(SpriteBundle {

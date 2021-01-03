@@ -9,7 +9,7 @@ https://github.com/HerbFargus/Atomic-Bomberman
 ** Asset loader for PCX
 
 * DATA
-** Sounds
+** DONE Sounds
 Files are in =/data/DATA/SOUND/=.
 Data is in RSS format (raw sound stream).
 Raw format is: 44100Hz PCM signed 16bit, little endian, mono.
@@ -33,7 +33,7 @@ Doesn't seem to be an official format.
 https://github.com/mmatyas/ab_aniex/blob/master/src/AniFile.cpp
 https://github.com/mattiz/JBomberman/blob/master/src/main/java/org/moogirc/jbomberman/parsers/AnimationParser.java
 
-** Images
+** DONE Images
 =/data/DATA/RES=
 in PCX format (https://en.wikipedia.org/wiki/PCX)
 
