@@ -1,10 +1,10 @@
+mod ani;
 mod pcx;
 mod rss;
-mod ani;
 
+use ani::AniAssetLoader;
 use pcx::PcxAssetLoader;
 use rss::RssAssetLoader;
-use ani::AniAssetLoader;
 
 use bevy::prelude::*;
 

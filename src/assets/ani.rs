@@ -1,9 +1,9 @@
 use anyhow::Result;
 use bevy::{
     asset::{AssetLoader, LoadContext, LoadedAsset},
-    render::texture::{Extent3d, Texture, TextureDimension, TextureFormat},
     prelude::*,
-    utils::BoxedFuture,    
+    render::texture::{Extent3d, Texture, TextureDimension, TextureFormat},
+    utils::BoxedFuture,
 };
 
 /// Convert Bomberman specific ANI format to a sprite sheet.
@@ -23,7 +23,7 @@ impl AssetLoader for AniAssetLoader {
             let height = 1;
             let data = vec![0; 4];
             let format = TextureFormat::Rgba8UnormSrgb;
-            
+
             let texture = Texture::new(
                 Extent3d::new(width, height, 1),
                 TextureDimension::D2,

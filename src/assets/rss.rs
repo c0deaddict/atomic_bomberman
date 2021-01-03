@@ -2,9 +2,9 @@ use anyhow::Result;
 use bevy::{
     asset::{AssetLoader, LoadContext, LoadedAsset},
     prelude::*,
-    utils::BoxedFuture,    
+    utils::BoxedFuture,
 };
-use byteorder::{LE, WriteBytesExt};
+use byteorder::{WriteBytesExt, LE};
 
 const SAMPLE_RATE: u32 = 44100;
 const NUM_CHANNELS: u16 = 1;
@@ -28,7 +28,7 @@ impl AssetLoader for RssAssetLoader {
     ) -> BoxedFuture<'a, Result<()>> {
         Box::pin(async move {
             load_context.set_default_asset(LoadedAsset::new(AudioSource {
-                bytes: prepend_wav_header(bytes).unwrap().into()
+                bytes: prepend_wav_header(bytes).unwrap().into(),
             }));
             Ok(())
         })
