@@ -105,12 +105,9 @@ impl<'a> Iterator for RleIterator<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<u8> {
-        if let Some(data) = self.rle_data {
+        if self.rle_len > 0 {
             self.rle_len -= 1;
-            if self.rle_len == 0 {
-                self.rle_data = None;
-            }
-            return Some(data);
+            return Some(self.rle_data.unwrap());
         }
 
         let control = match self.cursor.read_u8() {
@@ -120,7 +117,7 @@ impl<'a> Iterator for RleIterator<'a> {
 
         // RLE sequence if highest two bits are set.
         if control & 0b11000000 == 0b11000000 {
-            self.rle_len = control & 0b00111111;
+            self.rle_len = (control & 0b00111111) - 1;
             let data = match self.cursor.read_u8() {
                 Ok(b) => b,
                 Err(_) => return None,

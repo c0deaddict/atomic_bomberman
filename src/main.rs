@@ -26,6 +26,6 @@ fn setup(
 }
 
 fn load_and_play_audio(asset_server: Res<AssetServer>, audio: Res<Audio>) {
-    let music = asset_server.load("data/SOUND/MENU.RSS");
-    audio.play(music);
+    // let music = asset_server.load("data/SOUND/MENU.RSS");
+    // audio.play(music);
 }
