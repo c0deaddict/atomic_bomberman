@@ -1,14 +1,13 @@
 use anyhow::{bail, Result};
 use bevy::{
     asset::{AssetLoader, LoadContext, LoadedAsset},
+    reflect::TypeUuid,
     render::texture::{Extent3d, Texture, TextureDimension, TextureFormat},
     utils::BoxedFuture,
 };
 use byteorder::{ReadBytesExt, LE};
 use std::fmt::Debug;
 use std::io::{Cursor, Read, Seek, SeekFrom};
-
-// TODO: TGA alpha is not used, images seem to have a "alpha" color, find it somewhere in the file.
 
 /// Convert Bomberman specific ANI format to a sprite sheet.
 ///
@@ -18,6 +17,24 @@ use std::io::{Cursor, Read, Seek, SeekFrom};
 #[derive(Default)]
 pub struct AniAssetLoader;
 
+#[derive(Debug)]
+pub struct Animation {
+    pub name: String,
+    pub width: u32,
+    pub height: u32,
+    pub frames: Vec<usize>,
+}
+
+#[derive(Debug, TypeUuid)]
+#[uuid = "56c38dde-6ab4-4d02-93c1-976a7fa8dea2"]
+pub struct AnimationBundle {
+    pub texture: Texture,
+    pub tile_width: u32,
+    pub tile_height: u32,
+    pub tile_count: usize,
+    pub animations: Vec<Animation>,
+}
+
 impl AssetLoader for AniAssetLoader {
     fn load<'a>(
         &'a self,
@@ -26,8 +43,8 @@ impl AssetLoader for AniAssetLoader {
     ) -> BoxedFuture<'a, Result<()>> {
         Box::pin(async move {
             let mut decoder = AniDecoder::new(bytes)?;
-            let texture = decoder.read_image_data()?;
-            load_context.set_default_asset(LoadedAsset::new(texture));
+            let bundle = decoder.read_image_data()?;
+            load_context.set_default_asset(LoadedAsset::new(bundle));
             Ok(())
         })
     }
@@ -91,21 +108,6 @@ struct Frame {
 struct Seq {
     name: String,
     indices: Vec<usize>,
-}
-
-pub struct Animation {
-    pub name: String,
-    pub width: u32,
-    pub height: u32,
-    pub frames: Vec<usize>,
-}
-
-pub struct AnimationBundle {
-    pub texture: Texture,
-    pub tile_width: u32,
-    pub tile_height: u32,
-    pub tile_count: usize,
-    pub animations: Vec<Animation>,
 }
 
 #[derive(Default, Debug)]
@@ -325,77 +327,67 @@ impl<'a> AniDecoder<'a> {
     /// Sequences are composed of a HEAD followed by one or more STAT items.
     /// The HEAD contains the "name". Each STAT item contains a HEAD (which we
     /// ignore) and a FRAM. The FRAM contains a "frame index".
-    fn parse_animations(&mut self, seq: AniItem, frames: &[Frame]) -> Result<Vec<Animation>> {
-        let mut animations = vec![];
-
+    fn parse_animation(&mut self, seq: AniItem, frames: &[Frame]) -> Result<Animation> {
         let mut item = self.read_item()?;
-        loop {
-            if item.signature != *b"HEAD" {
-                bail!("Expected a HEAD item inside SEQ");
-            }
-
-            // We're only interested in the nul-terminated string in HEAD.
-            let mut buf = vec![0; item.length as usize];
-            self.cursor.read_exact(&mut buf)?;
-            let str_bytes = buf.iter().cloned().take_while(|b| *b != 0).collect();
-            let name = String::from_utf8(str_bytes).unwrap();
-
-            let mut frame_indices = vec![];
-            let mut first_frame: Option<&Frame> = None;
-
-            while self.cursor.position() < seq.end() {
-                item = self.read_item()?;
-                if item.signature != *b"STAT" {
-                    break;
-                }
-
-                self.parse_item(b"HEAD")?.skip(&mut self.cursor)?;
-                self.parse_item(b"FRAM")?;
-
-                let _id = self.cursor.read_u16::<LE>()?;
-                let index = self.cursor.read_u16::<LE>()? as usize;
-
-                // Maybe this is direction?
-                // 0x0000 = forward
-                // 0x0001 = backward
-                // 0xffff = ???
-                let _unknown1 = self.cursor.read_u16::<LE>()?;
-
-                // No idea what this means?
-                // Values seen: 0x0006, 0x0000, 0xffff, 0x0001
-                let _unknown2 = self.cursor.read_u16::<LE>()?;
-
-                // Padding? Is always 0x00000000
-                let _unknown3 = self.cursor.read_u32::<LE>()?;
-
-                let frame = &frames[index];
-                if let Some(first) = first_frame {
-                    if frame.width != first.width || frame.height != first.height {
-                        bail!("Frames of different dimensions in SEQ");
-                    }
-                } else {
-                    first_frame = Some(frame);
-                }
-
-                frame_indices.push(index);
-            }
-
-            animations.push(Animation {
-                name,
-                width: first_frame.unwrap().width,
-                height: first_frame.unwrap().height,
-                frames: frame_indices,
-            });
-
-            if self.cursor.position() >= seq.end() {
-                break;
-            }
+        if item.signature != *b"HEAD" {
+            bail!("Expected a HEAD item inside SEQ");
         }
 
-        Ok(animations)
+        // We're only interested in the nul-terminated string in HEAD.
+        let mut buf = vec![0; item.length as usize];
+        self.cursor.read_exact(&mut buf)?;
+        let str_bytes = buf.iter().cloned().take_while(|b| *b != 0).collect();
+        let name = String::from_utf8(str_bytes).unwrap();
+
+        let mut frame_indices = vec![];
+        let mut first_frame: Option<&Frame> = None;
+
+        while self.cursor.position() < seq.end() {
+            item = self.read_item()?;
+            if item.signature != *b"STAT" {
+                bail!("Expected STAT items after HEAD in SEQ");
+            }
+
+            self.parse_item(b"HEAD")?.skip(&mut self.cursor)?;
+            self.parse_item(b"FRAM")?;
+
+            let _id = self.cursor.read_u16::<LE>()?;
+            let index = self.cursor.read_u16::<LE>()? as usize;
+
+            // Maybe this is direction?
+            // 0x0000 = forward
+            // 0x0001 = backward
+            // 0xffff = ???
+            let _unknown1 = self.cursor.read_u16::<LE>()?;
+
+            // No idea what this means?
+            // Values seen: 0x0006, 0x0000, 0xffff, 0x0001
+            let _unknown2 = self.cursor.read_u16::<LE>()?;
+
+            // Padding? Is always 0x00000000
+            let _unknown3 = self.cursor.read_u32::<LE>()?;
+
+            let frame = &frames[index];
+            if let Some(first) = first_frame {
+                if frame.width != first.width || frame.height != first.height {
+                    bail!("Frames of different dimensions in SEQ");
+                }
+            } else {
+                first_frame = Some(frame);
+            }
+
+            frame_indices.push(index);
+        }
+
+        Ok(Animation {
+            name,
+            width: first_frame.unwrap().width,
+            height: first_frame.unwrap().height,
+            frames: frame_indices,
+        })
     }
 
-    fn read_image_data(&mut self) -> Result<Texture> {
+    fn read_image_data(&mut self) -> Result<AnimationBundle> {
         for sig in &[b"HEAD", b"PAL ", b"TPAL", b"CBOX"] {
             self.parse_item(*sig)?.skip(&mut self.cursor)?;
         }
@@ -407,30 +399,43 @@ impl<'a> AniDecoder<'a> {
             item = self.read_item()?;
         }
 
-        if item.signature != *b"SEQ " {
-            bail!("Expected a SEQ item at the end of the file");
+        let mut animations = vec![];
+        while item.signature == *b"SEQ " {
+            animations.push(self.parse_animation(item, &frames)?);
+            if self.cursor.position() >= self.file_end {
+                break;
+            }
+            item = self.read_item()?;
         }
 
-        let animations = self.parse_animations(item, &frames)?;
-
-        let total_height: u32 = frames.iter().map(|i| i.height).sum();
-        let max_width = frames.iter().map(|i| i.width).max().unwrap();
+        let tile_width = frames.iter().map(|i| i.width).max().unwrap();
+        let tile_height = frames.iter().map(|i| i.height).max().unwrap();
+        let tile_count = frames.len();
 
         // Build sprite sheet in vertical direction. Vertical because that
         // allows us to just concat all the image data together.
         //
         // Each frame is right-paded with transparent pixels to match it's width
-        // to the widest frame.
+        // to the widest frame. And bottom-padded with transparent rows to match
+        // the height of the highest frame. We need a constant tile size for the
+        // texture atlas to work.
         let image_data = frames
             .drain(0..)
             .flat_map(|mut frame| {
-                if frame.width < max_width {
+                if frame.width < tile_width {
                     for y in 0..frame.height {
-                        let idx = frame.width + (y * max_width);
+                        let idx = frame.width + (y * tile_width);
                         let idx = 4 * idx as usize;
-                        let extra = vec![0; 4 * (max_width - frame.width) as usize];
+                        let extra = vec![0; 4 * (tile_width - frame.width) as usize];
                         frame.data.splice(idx..idx, extra);
                     }
+                }
+                if frame.height < tile_height {
+                    frame.data.extend_from_slice(&vec![
+                        0;
+                        (4 * tile_width * (tile_height - frame.height))
+                            as usize
+                    ]);
                 }
 
                 frame.data
@@ -438,12 +443,18 @@ impl<'a> AniDecoder<'a> {
             .collect();
 
         let texture = Texture::new(
-            Extent3d::new(max_width, total_height, 1),
+            Extent3d::new(tile_width, tile_height * tile_count as u32, 1),
             TextureDimension::D2,
             image_data,
             TextureFormat::Rgba8UnormSrgb,
         );
 
-        Ok(texture)
+        Ok(AnimationBundle {
+            texture,
+            animations,
+            tile_width,
+            tile_height,
+            tile_count,
+        })
     }
 }
