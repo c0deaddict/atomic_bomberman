@@ -10,7 +10,7 @@ const SAMPLE_RATE: u32 = 44100;
 const NUM_CHANNELS: u16 = 1;
 const BITS_PER_SAMPLE: u16 = 16;
 
-/// RSS supposedly is an acronym for "Raw Sound Stream". It has no header, it
+/// RSS (supposedly) is an acronym for "Raw Sound Stream". It has no header, it
 /// only contains audio samples. The samples are PCM, 16bit, 44100Hz, little
 /// endian, mono.
 ///
@@ -18,9 +18,9 @@ const BITS_PER_SAMPLE: u16 = 16;
 /// contains just the raw bytes of the loaded file. By prepending a WAV header
 /// to the data with the fixed parameters, rodio can play the asset.
 #[derive(Default)]
-pub struct RssAssetLoader;
+pub struct RawSoundAssetLoader;
 
-impl AssetLoader for RssAssetLoader {
+impl AssetLoader for RawSoundAssetLoader {
     fn load<'a>(
         &'a self,
         bytes: &'a [u8],

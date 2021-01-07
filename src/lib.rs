@@ -1,1 +1,1 @@
-pub mod assets;
+pub mod asset_loaders;

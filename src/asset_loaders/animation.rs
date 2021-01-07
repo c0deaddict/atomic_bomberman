@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use bevy::{
-    asset::{AssetLoader, LoadContext, LoadedAsset},
+    asset::{AssetLoader, AssetPath, Handle, LoadContext, LoadedAsset},
     reflect::TypeUuid,
     render::texture::{Extent3d, Texture, TextureDimension, TextureFormat},
     utils::BoxedFuture,
@@ -15,7 +15,7 @@ use std::io::{Cursor, Read, Seek, SeekFrom};
 /// https://github.com/mmatyas/ab_aniex/blob/master/src/AniFile.cpp
 /// https://github.com/image-rs/image/blob/master/src/codecs/bmp/decoder.rs
 #[derive(Default)]
-pub struct AniAssetLoader;
+pub struct AnimationAssetLoader;
 
 #[derive(Debug)]
 pub struct Animation {
@@ -28,22 +28,25 @@ pub struct Animation {
 #[derive(Debug, TypeUuid)]
 #[uuid = "56c38dde-6ab4-4d02-93c1-976a7fa8dea2"]
 pub struct AnimationBundle {
-    pub texture: Texture,
+    pub texture: Handle<Texture>,
     pub tile_width: u32,
     pub tile_height: u32,
     pub tile_count: usize,
     pub animations: Vec<Animation>,
 }
 
-impl AssetLoader for AniAssetLoader {
+impl AssetLoader for AnimationAssetLoader {
     fn load<'a>(
         &'a self,
         bytes: &'a [u8],
         load_context: &'a mut LoadContext,
     ) -> BoxedFuture<'a, Result<()>> {
         Box::pin(async move {
-            let mut decoder = AniDecoder::new(bytes)?;
-            let bundle = decoder.read_image_data()?;
+            let mut decoder = Decoder::new(bytes)?;
+            let bundle = match decoder.load_animation_bundle(load_context) {
+                Ok(bundle) => bundle,
+                Err(err) => bail!("Error in {:?}: {:?}", load_context.path(), err),
+            };
             load_context.set_default_asset(LoadedAsset::new(bundle));
             Ok(())
         })
@@ -55,7 +58,7 @@ impl AssetLoader for AniAssetLoader {
 }
 
 #[derive(Debug, Default)]
-struct AniItem {
+struct Item {
     signature: [u8; 4],
     id: u16,
     length: u32,
@@ -75,7 +78,7 @@ fn print_bytes(bytes: &[u8]) {
     });
 }
 
-impl AniItem {
+impl Item {
     fn signature_str(&self) -> String {
         String::from_utf8(self.signature.into()).unwrap()
     }
@@ -111,7 +114,7 @@ struct Seq {
 }
 
 #[derive(Default, Debug)]
-struct AniDecoder<'a> {
+struct Decoder<'a> {
     cursor: Cursor<&'a [u8]>,
     has_loaded_metadata: bool,
     id: u16,
@@ -182,9 +185,9 @@ impl<'a, 'b> Iterator for TgaRleIterator<'a, 'b> {
     }
 }
 
-impl<'a> AniDecoder<'a> {
+impl<'a> Decoder<'a> {
     fn new(bytes: &'a [u8]) -> Result<Self> {
-        let mut decoder = AniDecoder {
+        let mut decoder = Decoder {
             cursor: Cursor::new(bytes),
             ..Default::default()
         };
@@ -216,8 +219,8 @@ impl<'a> AniDecoder<'a> {
         Ok(())
     }
 
-    fn read_item(&mut self) -> Result<AniItem> {
-        let mut item = AniItem::default();
+    fn read_item(&mut self) -> Result<Item> {
+        let mut item = Item::default();
         self.cursor.read_exact(&mut item.signature)?;
         item.length = self.cursor.read_u32::<LE>()?;
         item.id = self.cursor.read_u16::<LE>()?;
@@ -225,7 +228,7 @@ impl<'a> AniDecoder<'a> {
         Ok(item)
     }
 
-    fn parse_item(&mut self, signature: &[u8]) -> Result<AniItem> {
+    fn parse_item(&mut self, signature: &[u8]) -> Result<Item> {
         let item = self.read_item()?;
         if item.signature != *signature {
             bail!(
@@ -239,7 +242,7 @@ impl<'a> AniDecoder<'a> {
     }
 
     /// Each frame consists of a HEAD, followed by a FNAM and a CIMG.
-    fn parse_frame(&mut self, item: AniItem) -> Result<Frame> {
+    fn parse_frame(&mut self, item: Item) -> Result<Frame> {
         // Ignore HEAD and FNAM.
         self.parse_item(b"HEAD")?.skip(&mut self.cursor)?;
         self.parse_item(b"FNAM")?.skip(&mut self.cursor)?;
@@ -327,7 +330,7 @@ impl<'a> AniDecoder<'a> {
     /// Sequences are composed of a HEAD followed by one or more STAT items.
     /// The HEAD contains the "name". Each STAT item contains a HEAD (which we
     /// ignore) and a FRAM. The FRAM contains a "frame index".
-    fn parse_animation(&mut self, seq: AniItem, frames: &[Frame]) -> Result<Animation> {
+    fn parse_animation(&mut self, seq: Item, frames: &[Frame]) -> Result<Animation> {
         let mut item = self.read_item()?;
         if item.signature != *b"HEAD" {
             bail!("Expected a HEAD item inside SEQ");
@@ -345,7 +348,7 @@ impl<'a> AniDecoder<'a> {
         while self.cursor.position() < seq.end() {
             item = self.read_item()?;
             if item.signature != *b"STAT" {
-                bail!("Expected STAT items after HEAD in SEQ");
+                bail!("Expected STAT items after HEAD in SEQ, got {:?}", item.signature);
             }
 
             self.parse_item(b"HEAD")?.skip(&mut self.cursor)?;
@@ -370,7 +373,10 @@ impl<'a> AniDecoder<'a> {
             let frame = &frames[index];
             if let Some(first) = first_frame {
                 if frame.width != first.width || frame.height != first.height {
-                    bail!("Frames of different dimensions in SEQ");
+                    println!(
+                        "Frames of different dimensions in SEQ: {}x{} and {}x{}",
+                        frame.width, frame.height, first.width, first.height
+                    );
                 }
             } else {
                 first_frame = Some(frame);
@@ -387,7 +393,7 @@ impl<'a> AniDecoder<'a> {
         })
     }
 
-    fn read_image_data(&mut self) -> Result<AnimationBundle> {
+    fn load_animation_bundle(&mut self, load_context: &mut LoadContext) -> Result<AnimationBundle> {
         for sig in &[b"HEAD", b"PAL ", b"TPAL", b"CBOX"] {
             self.parse_item(*sig)?.skip(&mut self.cursor)?;
         }
@@ -449,12 +455,16 @@ impl<'a> AniDecoder<'a> {
             TextureFormat::Rgba8UnormSrgb,
         );
 
+        let texture_label = "texture";
+        load_context.set_labeled_asset(texture_label, LoadedAsset::new(texture));
+        let texture_path = AssetPath::new_ref(load_context.path(), Some(texture_label));
+
         Ok(AnimationBundle {
-            texture,
             animations,
             tile_width,
             tile_height,
             tile_count,
+            texture: load_context.get_handle(texture_path),
         })
     }
 }

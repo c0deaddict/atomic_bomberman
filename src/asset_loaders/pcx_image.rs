@@ -15,9 +15,9 @@ use std::io::{Cursor, Read, Seek, SeekFrom};
 /// https://en.wikipedia.org/wiki/PCX
 /// http://fastgraph.com/help/pcx_header_format.html
 #[derive(Default)]
-pub struct PcxAssetLoader;
+pub struct PcxImageAssetLoader;
 
-impl AssetLoader for PcxAssetLoader {
+impl AssetLoader for PcxImageAssetLoader {
     fn load<'a>(
         &'a self,
         bytes: &'a [u8],
