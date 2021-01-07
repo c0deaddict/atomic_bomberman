@@ -1,13 +1,14 @@
 use anyhow::{bail, Result};
 use bevy::{
     asset::{AssetLoader, AssetPath, Handle, LoadContext, LoadedAsset},
+    prelude::*,
     reflect::TypeUuid,
-    render::texture::{Extent3d, Texture, TextureDimension, TextureFormat},
+    render::texture::{Extent3d, TextureDimension, TextureFormat},
     utils::BoxedFuture,
 };
 use byteorder::{ReadBytesExt, LE};
 use std::fmt::Debug;
-use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
 /// Convert Bomberman specific ANI format to a sprite sheet.
 ///
@@ -17,22 +18,31 @@ use std::io::{Cursor, Read, Seek, SeekFrom};
 #[derive(Default)]
 pub struct AnimationAssetLoader;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub struct Frame {
+    pub index: usize,
+    pub width: u32,
+    pub height: u32,
+    pub offset_x: i32,
+    pub offset_y: i32,
+}
+
+#[derive(Debug, Clone)]
 pub struct Animation {
     pub name: String,
     pub width: u32,
     pub height: u32,
-    pub frames: Vec<usize>,
+    pub frames: Vec<Frame>,
 }
 
 #[derive(Debug, TypeUuid)]
 #[uuid = "56c38dde-6ab4-4d02-93c1-976a7fa8dea2"]
 pub struct AnimationBundle {
-    pub texture: Handle<Texture>,
     pub tile_width: u32,
     pub tile_height: u32,
     pub tile_count: usize,
     pub animations: Vec<Animation>,
+    pub texture_atlas: Handle<TextureAtlas>,
 }
 
 impl AssetLoader for AnimationAssetLoader {
@@ -78,6 +88,8 @@ fn print_bytes(bytes: &[u8]) {
     });
 }
 
+type ByteCursor<'a> = Cursor<&'a [u8]>;
+
 impl Item {
     fn signature_str(&self) -> String {
         String::from_utf8(self.signature.into()).unwrap()
@@ -87,7 +99,7 @@ impl Item {
         self.start + self.length as u64
     }
 
-    fn dump(&self, cursor: &mut Cursor<&[u8]>) -> Result<()> {
+    fn dump(&self, cursor: &mut ByteCursor) -> Result<()> {
         let mut buf = vec![0; self.length as usize];
         cursor.read_exact(&mut buf)?;
         println!("{} {:?}", self.signature_str(), self);
@@ -95,13 +107,13 @@ impl Item {
         Ok(())
     }
 
-    fn skip(&self, cursor: &mut Cursor<&[u8]>) -> Result<()> {
+    fn skip(&self, cursor: &mut ByteCursor) -> Result<()> {
         cursor.seek(SeekFrom::Current(self.length as i64))?;
         Ok(())
     }
 }
 
-struct Frame {
+struct FrameImage {
     width: u32,
     height: u32,
     /// 32bit RGBA encoded pixels.
@@ -115,21 +127,37 @@ struct Seq {
 
 #[derive(Default, Debug)]
 struct Decoder<'a> {
-    cursor: Cursor<&'a [u8]>,
+    cursor: ByteCursor<'a>,
     has_loaded_metadata: bool,
     id: u16,
     file_end: u64,
 }
 
-struct TgaRleIterator<'a, 'b> {
-    cursor: &'a mut Cursor<&'b [u8]>,
-    rle_data: Option<u16>,
+trait TgaReadPixel<T> {
+    fn read(cursor: &mut ByteCursor) -> io::Result<T>;
+}
+
+impl TgaReadPixel<u8> for u8 {
+    fn read(cursor: &mut ByteCursor) -> io::Result<u8> {
+        cursor.read_u8()
+    }
+}
+
+impl TgaReadPixel<u16> for u16 {
+    fn read(cursor: &mut ByteCursor) -> io::Result<u16> {
+        cursor.read_u16::<LE>()
+    }
+}
+
+struct TgaRleIterator<'a, 'b, T> {
+    cursor: &'a mut ByteCursor<'b>,
+    rle_data: Option<T>,
     rle_len: u8,
     raw_len: u8,
 }
 
-impl<'a, 'b> TgaRleIterator<'a, 'b> {
-    fn new(cursor: &'a mut Cursor<&'b [u8]>) -> Self {
+impl<'a, 'b, T> TgaRleIterator<'a, 'b, T> {
+    fn new(cursor: &'a mut ByteCursor<'b>) -> Self {
         TgaRleIterator {
             cursor,
             rle_data: None,
@@ -139,7 +167,7 @@ impl<'a, 'b> TgaRleIterator<'a, 'b> {
     }
 }
 
-/// TGA run length encoding iterator
+/// TGA run length encoding iterator.
 ///
 /// If hightest bit of the control byte is set, the next 16 bits are a pixel
 /// value that is to be repeated `control - highest bit` times.
@@ -148,17 +176,20 @@ impl<'a, 'b> TgaRleIterator<'a, 'b> {
 /// values that are read in order. This is called a "raw packet" in TGA.
 ///
 /// For more info see: http://www.ludorg.net/amnesia/TGA_File_Format_Spec.html
-impl<'a, 'b> Iterator for TgaRleIterator<'a, 'b> {
-    type Item = u16;
+impl<'a, 'b, T> Iterator for TgaRleIterator<'a, 'b, T>
+where
+    T: Copy + TgaReadPixel<T>,
+{
+    type Item = T;
 
     #[inline]
-    fn next(&mut self) -> Option<u16> {
+    fn next(&mut self) -> Option<T> {
         if self.rle_len > 0 {
             self.rle_len -= 1;
             return self.rle_data;
         } else if self.raw_len > 0 {
             self.raw_len -= 1;
-            return self.cursor.read_u16::<LE>().ok();
+            return T::read(&mut self.cursor).ok();
         }
 
         let control = match self.cursor.read_u8() {
@@ -168,7 +199,7 @@ impl<'a, 'b> Iterator for TgaRleIterator<'a, 'b> {
 
         // For both RLE and Raw packets we need to the next pixel value.
         let len = control & 0b01111111;
-        let data = match self.cursor.read_u16::<LE>() {
+        let data = match T::read(&mut self.cursor) {
             Ok(b) => b,
             Err(_) => return None,
         };
@@ -242,85 +273,134 @@ impl<'a> Decoder<'a> {
     }
 
     /// Each frame consists of a HEAD, followed by a FNAM and a CIMG.
-    fn parse_frame(&mut self, item: Item) -> Result<Frame> {
-        // Ignore HEAD and FNAM.
+    fn parse_frame(&mut self, item: Item) -> Result<FrameImage> {
+        // Ignore HEAD.
         self.parse_item(b"HEAD")?.skip(&mut self.cursor)?;
-        self.parse_item(b"FNAM")?.skip(&mut self.cursor)?;
 
-        let item = self.parse_item(b"CIMG")?;
+        // Ignore FNAM, if present. It's missing in CLASSICS.ANI
+        let mut item = self.read_item()?;
+        if item.signature == *b"FNAM" {
+            item.skip(&mut self.cursor)?;
+            item = self.read_item()?;
+        }
+        if item.signature != *b"CIMG" {
+            bail!("Expected CIMG item in frame");
+        }
 
         if item.length < 32 {
             bail!("CIMG is too small: {} < 32", item.length);
         }
 
-        if self.cursor.read_u16::<LE>()? != 0x0004 {
-            bail!("CIMG type must be 0x0004 (16 bits per pixel)");
-        }
+        let bits_per_pixel = match self.cursor.read_u16::<LE>()? {
+            0x0004 => 16,
+            0x000b => 8,
+            other => bail!("CIMG type {:#06x} is not supported", other),
+        };
 
         // Unknown field.
-        let unknown1 = self.cursor.read_u16::<LE>()?;
+        let _unknown1 = self.cursor.read_u16::<LE>()?;
 
-        let additional_size = self.cursor.read_u32::<LE>()?;
+        let mut palette_size = None;
+        let additional_size = self.cursor.read_u32::<LE>()? as usize;
         if additional_size >= 32 {
-            bail!("CIMG palette header not supported");
-        }
+            if additional_size > 32 {
+                palette_size = Some(additional_size - 32);
+            } else {
+                bail!("CIMG palette is missing!");
+            }
+        };
 
         // Unknown field.
-        let unknown2 = self.cursor.read_u32::<LE>()?;
+        let _unknown2 = self.cursor.read_u32::<LE>()?;
 
         let width = self.cursor.read_u16::<LE>()? as u32;
         let height = self.cursor.read_u16::<LE>()? as u32;
         let hotspot_x = self.cursor.read_u16::<LE>()? as u32;
         let hotspot_y = self.cursor.read_u16::<LE>()? as u32;
-        let keycolor_bytes = self.cursor.read_u16::<LE>()?;
+        let _keycolor_bytes = self.cursor.read_u16::<LE>()?;
 
         // Unknown field.
-        let unknown3 = self.cursor.read_u16::<LE>()?;
+        let _unknown3 = self.cursor.read_u16::<LE>()?;
 
-        // NOTE: optional palette header should be read here. Skipping that
-        // here, since the original game files don't use this.
+        let mut palette: Option<Vec<Vec<u8>>> = None;
+        if let Some(size) = palette_size {
+            let _unknown4 = self.cursor.read_u32::<LE>()?;
+            let _unknown5 = self.cursor.read_u32::<LE>()?;
+
+            let mut buf = vec![0; size];
+            self.cursor.read_exact(&mut buf)?;
+            palette = Some(buf.chunks(4).map(|c| c.to_vec()).collect());
+        }
 
         // Unknown fields.
-        let unknown4 = self.cursor.read_u16::<LE>()?;
-        let unknown5 = self.cursor.read_u16::<LE>()?;
+        let _unknown6 = self.cursor.read_u16::<LE>()?;
+        let _unknown7 = self.cursor.read_u16::<LE>()?;
 
         let _compressed_size = self.cursor.read_u32::<LE>()? - 12;
         let _uncompressed_size = self.cursor.read_u32::<LE>()?;
 
-        // println!("{} {} {}", hotspot_x, hotspot_y, keycolor_bytes);
-        // println!("{} {} {} {} {}", unknown1, unknown2, unknown3, unknown4, unknown5);
+        let data = if bits_per_pixel == 16 {
+            if palette_size.is_some() {
+                bail!("CIMG 16bpp expected no palette");
+            }
 
-        // Decode the TGA RLE encoding into raw data.
-        let raw_data = TgaRleIterator::new(&mut self.cursor)
-            .take((width * height) as usize)
-            .collect::<Vec<u16>>();
+            // Decode the TGA RLE encoding into 16bpp raw data.
+            let raw_data = TgaRleIterator::new(&mut self.cursor)
+                .take((width * height) as usize)
+                .collect::<Vec<u16>>();
 
-        let hotspot_idx = hotspot_x + width * hotspot_y;
-        let hotspot = raw_data[hotspot_idx as usize];
-        // let hotspot = 0x0000;
+            let hotspot_idx = hotspot_x + width * hotspot_y;
+            let hotspot = raw_data[hotspot_idx as usize];
 
-        // Convert the 16 bit color values to 32bit RGBA. Pixels that match the
-        // hotspot are made transparent. The 16 bit pixel format has support for
-        // an alpha channel (the highest bit, but that is not used).
-        let data = raw_data
-            .iter()
-            .flat_map(|v| {
-                if *v == hotspot || v & 0b1000_0000_0000_0000 != 0 {
-                    // if v == 0x4210 || v == 0x7f7f || v == 0x7f5f {
-                    vec![0, 0, 0, 0]
-                } else {
-                    let r = (((v & 0b0111_1100_0000_0000) >> 10) << 3) as u8;
-                    let g = (((v & 0b0000_0011_1110_0000) >> 5) << 3) as u8;
-                    let b = ((v & 0b0000_0000_0001_1111) << 3) as u8;
-                    vec![r, g, b, 255]
-                }
-            })
-            .collect::<Vec<u8>>();
+            // Convert the 16 bit color values to 32bit RGBA. Pixels that match the
+            // hotspot are made transparent. The 16 bit pixel format has support for
+            // an alpha channel (the highest bit, but that is not used).
+            raw_data
+                .iter()
+                .flat_map(|v| {
+                    if *v == hotspot || v & 0b1000_0000_0000_0000 != 0 {
+                        // if v == 0x4210 || v == 0x7f7f || v == 0x7f5f {
+                        vec![0, 0, 0, 0]
+                    } else {
+                        let r = (((v & 0b0111_1100_0000_0000) >> 10) << 3) as u8;
+                        let g = (((v & 0b0000_0011_1110_0000) >> 5) << 3) as u8;
+                        let b = ((v & 0b0000_0000_0001_1111) << 3) as u8;
+                        vec![r, g, b, 255]
+                    }
+                })
+                .collect()
+        } else {
+            if palette_size.is_none() || palette_size.unwrap() != 1024 {
+                bail!("CIMG 8bpp expected a palette size of 1024");
+            }
+
+            // Decode the TGA RLE encoding into 8bpp raw data.
+            let raw_data = TgaRleIterator::new(&mut self.cursor)
+                .take((width * height) as usize)
+                .collect::<Vec<u8>>();
+
+            let hotspot_idx = hotspot_x + width * hotspot_y;
+            let hotspot = raw_data[hotspot_idx as usize];
+
+            let palette = palette.unwrap();
+
+            // Convert the 8 bit color values via the palette to 32 bits RGBA.
+            raw_data
+                .iter()
+                .flat_map(|v| {
+                    if *v == hotspot {
+                        vec![0, 0, 0, 0]
+                    } else {
+                        palette[*v as usize].clone()
+                    }
+                })
+                .collect()
+        };
 
         // For some reason one byte is not consumed?
         self.cursor.read_u8()?;
 
-        Ok(Frame {
+        Ok(FrameImage {
             width,
             height,
             data,
@@ -330,7 +410,7 @@ impl<'a> Decoder<'a> {
     /// Sequences are composed of a HEAD followed by one or more STAT items.
     /// The HEAD contains the "name". Each STAT item contains a HEAD (which we
     /// ignore) and a FRAM. The FRAM contains a "frame index".
-    fn parse_animation(&mut self, seq: Item, frames: &[Frame]) -> Result<Animation> {
+    fn parse_animation(&mut self, seq: Item, frame_images: &[FrameImage]) -> Result<Animation> {
         let mut item = self.read_item()?;
         if item.signature != *b"HEAD" {
             bail!("Expected a HEAD item inside SEQ");
@@ -342,54 +422,54 @@ impl<'a> Decoder<'a> {
         let str_bytes = buf.iter().cloned().take_while(|b| *b != 0).collect();
         let name = String::from_utf8(str_bytes).unwrap();
 
-        let mut frame_indices = vec![];
-        let mut first_frame: Option<&Frame> = None;
+        let mut frames = vec![];
 
         while self.cursor.position() < seq.end() {
             item = self.read_item()?;
             if item.signature != *b"STAT" {
-                bail!("Expected STAT items after HEAD in SEQ, got {:?}", item.signature);
+                bail!(
+                    "Expected STAT items after HEAD in SEQ, got {:?}",
+                    item.signature
+                );
             }
 
             self.parse_item(b"HEAD")?.skip(&mut self.cursor)?;
-            self.parse_item(b"FRAM")?;
+            let fram_item = self.parse_item(b"FRAM")?;
 
             let _id = self.cursor.read_u16::<LE>()?;
             let index = self.cursor.read_u16::<LE>()? as usize;
+            // XXX: for one ANI file an index is too large, this fixes it.
+            let index = index.min(frame_images.len() - 1);
 
-            // Maybe this is direction?
-            // 0x0000 = forward
-            // 0x0001 = backward
-            // 0xffff = ???
-            let _unknown1 = self.cursor.read_u16::<LE>()?;
-
-            // No idea what this means?
-            // Values seen: 0x0006, 0x0000, 0xffff, 0x0001
-            let _unknown2 = self.cursor.read_u16::<LE>()?;
+            let offset_x = self.cursor.read_i16::<LE>()? as i32;
+            let offset_y = self.cursor.read_i16::<LE>()? as i32;
 
             // Padding? Is always 0x00000000
             let _unknown3 = self.cursor.read_u32::<LE>()?;
 
-            let frame = &frames[index];
-            if let Some(first) = first_frame {
-                if frame.width != first.width || frame.height != first.height {
-                    println!(
-                        "Frames of different dimensions in SEQ: {}x{} and {}x{}",
-                        frame.width, frame.height, first.width, first.height
-                    );
-                }
-            } else {
-                first_frame = Some(frame);
-            }
+            // Sometimes the FRAM is longer, usually it's 12 bytes, but there
+            // are cases of 22 bytes.
+            self.cursor.seek(SeekFrom::Start(fram_item.end()))?;
 
-            frame_indices.push(index);
+            let image = &frame_images[index];
+
+            frames.push(Frame {
+                index,
+                offset_x,
+                offset_y,
+                width: image.width,
+                height: image.height,
+            });
         }
+
+        let width = frames.iter().map(|f| f.width).max().unwrap();
+        let height = frames.iter().map(|f| f.height).max().unwrap();
 
         Ok(Animation {
             name,
-            width: first_frame.unwrap().width,
-            height: first_frame.unwrap().height,
-            frames: frame_indices,
+            frames,
+            width,
+            height,
         })
     }
 
@@ -437,11 +517,10 @@ impl<'a> Decoder<'a> {
                     }
                 }
                 if frame.height < tile_height {
-                    frame.data.extend_from_slice(&vec![
-                        0;
-                        (4 * tile_width * (tile_height - frame.height))
-                            as usize
-                    ]);
+                    let rows = tile_height - frame.height;
+                    frame
+                        .data
+                        .extend_from_slice(&vec![0; (4 * tile_width * rows) as usize]);
                 }
 
                 frame.data
@@ -459,12 +538,23 @@ impl<'a> Decoder<'a> {
         load_context.set_labeled_asset(texture_label, LoadedAsset::new(texture));
         let texture_path = AssetPath::new_ref(load_context.path(), Some(texture_label));
 
+        let texture_atlas = TextureAtlas::from_grid(
+            load_context.get_handle(texture_path),
+            Vec2::new(tile_width as f32, tile_height as f32),
+            1,
+            tile_count,
+        );
+
+        let texture_atlas_label = "texture_atlas";
+        load_context.set_labeled_asset(texture_atlas_label, LoadedAsset::new(texture_atlas));
+        let texture_atlas_path = AssetPath::new_ref(load_context.path(), Some(texture_atlas_label));
+
         Ok(AnimationBundle {
             animations,
             tile_width,
             tile_height,
             tile_count,
-            texture: load_context.get_handle(texture_path),
+            texture_atlas: load_context.get_handle(texture_atlas_path),
         })
     }
 }

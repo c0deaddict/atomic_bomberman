@@ -3,7 +3,7 @@ mod pcx_image;
 mod raw_sound;
 
 use animation::AnimationAssetLoader;
-pub use animation::AnimationBundle;
+pub use animation::{Animation, AnimationBundle, Frame};
 use pcx_image::PcxImageAssetLoader;
 use raw_sound::RawSoundAssetLoader;
 
