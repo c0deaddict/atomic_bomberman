@@ -46,3 +46,8 @@ https://github.com/bevyengine/bevy/blob/acc29ec719814d4814444d26cca023c08307c316
 
 ** Schemes
 Level layout files, are in ASCII readable format.
+
+
+** COLOR.PAL
+
+https://falloutmods.fandom.com/wiki/PAL_File_Format

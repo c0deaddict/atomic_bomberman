@@ -7,6 +7,7 @@ use bevy::{
     utils::BoxedFuture,
 };
 use byteorder::{ReadBytesExt, LE};
+use itertools::Itertools;
 use std::fmt::Debug;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
@@ -317,7 +318,9 @@ impl<'a> Decoder<'a> {
         let height = self.cursor.read_u16::<LE>()? as u32;
         let hotspot_x = self.cursor.read_u16::<LE>()? as u32;
         let hotspot_y = self.cursor.read_u16::<LE>()? as u32;
-        let _keycolor_bytes = self.cursor.read_u16::<LE>()?;
+        let transparent = self.cursor.read_u16::<LE>()?;
+
+        // println!("hotspot = {}x{} transparent {:#06x}", hotspot_x, hotspot_y, transparent);
 
         // Unknown field.
         let _unknown3 = self.cursor.read_u16::<LE>()?;
@@ -336,35 +339,42 @@ impl<'a> Decoder<'a> {
         let _unknown6 = self.cursor.read_u16::<LE>()?;
         let _unknown7 = self.cursor.read_u16::<LE>()?;
 
+        // println!("{:#06x} {:#06x}", _unknown6, _unknown7);
+
         let _compressed_size = self.cursor.read_u32::<LE>()? - 12;
         let _uncompressed_size = self.cursor.read_u32::<LE>()?;
 
-        let data = if bits_per_pixel == 16 {
+        let data: Vec<u8> = if bits_per_pixel == 16 {
             if palette_size.is_some() {
-                bail!("CIMG 16bpp expected no palette");
+                println!("{:?}", palette.unwrap());
+                println!(
+                    "CIMG 16bpp expected no palette, size found {}",
+                    palette_size.unwrap()
+                );
             }
 
-            // Decode the TGA RLE encoding into 16bpp raw data.
-            let raw_data = TgaRleIterator::new(&mut self.cursor)
+            let raw_data: Vec<u16> = TgaRleIterator::new(&mut self.cursor)
                 .take((width * height) as usize)
-                .collect::<Vec<u16>>();
+                .collect();
 
-            let hotspot_idx = hotspot_x + width * hotspot_y;
-            let hotspot = raw_data[hotspot_idx as usize];
+            // println!("{:?}", raw_data.iter().sorted().dedup().map(|v| format!("{:04x}", v)).collect::<Vec<String>>());
 
-            // Convert the 16 bit color values to 32bit RGBA. Pixels that match the
-            // hotspot are made transparent. The 16 bit pixel format has support for
-            // an alpha channel (the highest bit, but that is not used).
+            // Convert the 16 bit color values to 32bit RGBA. The 16 bit pixel
+            // format has support for an alpha channel (the highest bit) but
+            // that is not used. Instead alpha is set to all pixels that match
+            // `transparent`.
             raw_data
                 .iter()
                 .flat_map(|v| {
-                    if *v == hotspot || v & 0b1000_0000_0000_0000 != 0 {
-                        // if v == 0x4210 || v == 0x7f7f || v == 0x7f5f {
+                    if *v == transparent || v & 0b1000_0000_0000_0000 != 0 {
                         vec![0, 0, 0, 0]
                     } else {
                         let r = (((v & 0b0111_1100_0000_0000) >> 10) << 3) as u8;
                         let g = (((v & 0b0000_0011_1110_0000) >> 5) << 3) as u8;
                         let b = ((v & 0b0000_0000_0001_1111) << 3) as u8;
+                        // if g > 128 && r < 128 && b < 128 {
+                        //     println!("{:02x},{:02x},{:02x} {:04x}", r,g,b,v);
+                        // }
                         vec![r, g, b, 255]
                     }
                 })
@@ -465,6 +475,8 @@ impl<'a> Decoder<'a> {
         let width = frames.iter().map(|f| f.width).max().unwrap();
         let height = frames.iter().map(|f| f.height).max().unwrap();
 
+        println!("loaded animation {}", name);
+
         Ok(Animation {
             name,
             frames,
@@ -475,7 +487,13 @@ impl<'a> Decoder<'a> {
 
     fn load_animation_bundle(&mut self, load_context: &mut LoadContext) -> Result<AnimationBundle> {
         for sig in &[b"HEAD", b"PAL ", b"TPAL", b"CBOX"] {
-            self.parse_item(*sig)?.skip(&mut self.cursor)?;
+            let item = self.parse_item(*sig)?;
+            if item.signature == *b"PAL " {
+                // item.dump(&mut self.cursor)?;
+                item.skip(&mut self.cursor)?;
+            } else {
+                item.skip(&mut self.cursor)?;
+            }
         }
 
         let mut frames = vec![];
