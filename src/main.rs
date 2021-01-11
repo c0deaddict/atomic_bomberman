@@ -1,5 +1,5 @@
-use atomic_bomberman::asset_loaders::*;
-use bevy::prelude::*;
+use atomic_bomberman::{animated_sprite::*, asset_loaders::*};
+use bevy::{diagnostic::FrameTimeDiagnosticsPlugin, prelude::*};
 use std::cmp::PartialEq;
 use std::env;
 use std::fmt::Debug;
@@ -7,12 +7,13 @@ use std::fmt::Debug;
 fn main() {
     App::build()
         .add_plugins(DefaultPlugins)
+        .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(CustomAssetLoaders)
+        .add_plugin(AnimatedSpritePlugin)
         .add_resource(TestTimer(Timer::from_seconds(3.0, true)))
         .init_resource::<State>()
         .add_startup_system(setup.system())
         .add_startup_system(load_and_play_audio.system())
-        .add_system(animate_sprite_system.system())
         .add_system(create_sprite_on_load.system())
         .add_system(player_movement.system())
         .add_system(change_sprite.system())
@@ -60,36 +61,10 @@ struct PlayerDirection(Direction);
 
 struct TestTimer(Timer);
 
-struct AnimateSprite {
-    animation: Animation,
-    index: usize,
-}
-
 #[derive(Default)]
 struct State {
     handle: Handle<AnimationBundle>,
     loaded: bool,
-}
-
-fn animate_sprite_system(
-    time: Res<Time>,
-    texture_atlases: Res<Assets<TextureAtlas>>,
-    mut query: Query<(
-        &mut Timer,
-        &mut TextureAtlasSprite,
-        &mut AnimateSprite,
-        &Handle<TextureAtlas>,
-    )>,
-) {
-    for (mut timer, mut sprite, mut animate_sprite, texture_atlas_handle) in query.iter_mut() {
-        timer.tick(time.delta_seconds());
-        if timer.finished() {
-            let texture_atlas = texture_atlases.get(texture_atlas_handle).unwrap();
-            animate_sprite.index =
-                (animate_sprite.index + 1) % animate_sprite.animation.frames.len();
-            sprite.index = animate_sprite.animation.frames[animate_sprite.index].index as u32;
-        }
-    }
 }
 
 fn setup(
@@ -134,6 +109,7 @@ fn setup(
 
     commands
         .spawn(Camera2dBundle::default())
+        // .spawn(UiCameraComponents::default())        
         // .spawn(SpriteBundle {
         //     material: materials.add(texture_handle.into()),
         //     transform: Transform::from_scale(Vec3::splat(8.0)),
@@ -190,20 +166,7 @@ fn create_sprite_on_load(
             PlayerDirection(Direction::North),
         ))
         .with_children(|parent| {
-            parent
-                .spawn(SpriteSheetBundle {
-                    texture_atlas: bundle.texture_atlas.clone(),
-                    transform: Transform::from_scale(Vec3::splat(3.0))
-                        .mul_transform(Transform::from_translation(Vec3::new(0., 0., 0.0))),
-                    sprite: TextureAtlasSprite::new(animation.frames[0].index as u32),
-                    ..Default::default()
-                })
-                // TODO: make AnimateSpriteBundle
-                .with(AnimateSprite {
-                    animation: animation.clone(),
-                    index: 0, // i % animation.frames.len(),
-                })
-                .with(Timer::from_seconds(1. / 25., true));
+            AnimatedSprite::spawn_child(parent, &bundle, animation);
         });
 
     state.loaded = true;
@@ -235,20 +198,7 @@ fn change_sprite(
         println!("animation {}", animation.name);
 
         // only add timer if frames.length > 1
-        let child = commands
-            .spawn(SpriteSheetBundle {
-                texture_atlas: bundle.texture_atlas.clone(),
-                transform: Transform::from_scale(Vec3::splat(3.0))
-                    .mul_transform(Transform::from_translation(Vec3::new(0., 0., 0.0))),
-                sprite: TextureAtlasSprite::new(animation.frames[0].index as u32),
-                ..Default::default()
-            })
-            // TODO: make AnimateSpriteBundle
-            .with(AnimateSprite {
-                animation: animation.clone(),
-                index: 0,
-            })
-            .with(Timer::from_seconds(1. / 25., true))
+        let child = AnimatedSprite::spawn(commands, &bundle, animation)
             .current_entity()
             .unwrap();
 
@@ -287,3 +237,13 @@ fn player_movement(
         }
     }
 }
+
+// https://github.com/bevyengine/bevy/pull/273
+
+// fn counter_system(diagnostics: Res<Diagnostics>, mut text: Mut<Text>) {
+//     if let Some(fps) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
+//         if let Some(average) = fps.average() {
+//             text.value = format!("FPS: {:.2}", average);
+//         }
+//     };
+// }

@@ -1,9 +1,11 @@
 mod animation;
+mod color_palette;
 mod pcx_image;
 mod raw_sound;
 
 use animation::AnimationAssetLoader;
 pub use animation::{Animation, AnimationBundle, Frame};
+use color_palette::ColorPaletteAssetLoader;
 use pcx_image::PcxImageAssetLoader;
 use raw_sound::RawSoundAssetLoader;
 
@@ -18,6 +20,7 @@ impl Plugin for CustomAssetLoaders {
         app.add_asset::<AnimationBundle>()
             .init_asset_loader::<PcxImageAssetLoader>()
             .init_asset_loader::<RawSoundAssetLoader>()
-            .init_asset_loader::<AnimationAssetLoader>();
+            .init_asset_loader::<AnimationAssetLoader>()
+            .init_asset_loader::<ColorPaletteAssetLoader>();
     }
 }
