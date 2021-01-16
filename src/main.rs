@@ -64,6 +64,7 @@ struct TestTimer(Timer);
 #[derive(Default)]
 struct State {
     handle: Handle<AnimationBundle>,
+    animation_list: Handle<AnimationList>,
     loaded: bool,
 }
 
@@ -82,14 +83,15 @@ fn setup(
 
     //  in "data/ANI/MFLAME.ANI": CIMG 16bpp expected no palette)
 
-    // TODO: load text file: data/ANI/MASTER.ALI
-    // and include all ANI's that are in that file.
-
     // https://stackoverflow.com/questions/65330265/how-can-i-load-all-the-audio-files-inside-a-folder-using-bevy
     // let bundles: Vec<HandleUntyped> = asset_server.load_folder("data/ANI").unwrap();
 
     // let texture_handle = asset_server.load("data/RES/MAINMENU.PCX");
     // let texture_handle = asset_server.load("data/COLOR.PAL");
+
+    state.animation_list = asset_server.load("data/ANI/MASTER.ALI");
+
+    let scheme: Handle<Scheme> = asset_server.load("data/SCHEMES/X.SCH");
 
     let args: Vec<String> = env::args().collect();
 
