@@ -6,13 +6,13 @@ use bevy::{
 };
 use byteorder::{WriteBytesExt, LE};
 
-const SAMPLE_RATE: u32 = 44100;
-const NUM_CHANNELS: u16 = 1;
+const SAMPLE_RATE: u32 = 22000;
+const NUM_CHANNELS: u16 = 2;
 const BITS_PER_SAMPLE: u16 = 16;
 
 /// RSS (supposedly) is an acronym for "Raw Sound Stream". It has no header, it
-/// only contains audio samples. The samples are PCM, 16bit, 44100Hz, little
-/// endian, mono.
+/// only contains audio samples. The samples are stereo PCM, 16bit, 22000Hz,
+/// little endian.
 ///
 /// Bevy is using the `rodio` library for audio decoding. An audio asset
 /// contains just the raw bytes of the loaded file. By prepending a WAV header
@@ -58,7 +58,7 @@ fn prepend_wav_header(bytes: &[u8]) -> Result<Vec<u8>> {
     res.write_u32::<LE>(16)?;
     // AudioFormat: 1 = PCM
     res.write_u16::<LE>(1)?;
-    // NumChannels: 1
+    // NumChannels: 2
     res.write_u16::<LE>(NUM_CHANNELS)?;
     // SampleRate: 44100
     res.write_u32::<LE>(SAMPLE_RATE)?;

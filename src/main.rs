@@ -23,8 +23,14 @@ fn main() {
 // TODO: menu and asset loading screen
 // https://github.com/bevyengine/bevy/blob/master/examples/ecs/state.rs
 
-// TODO: change the sprite of an entity:
-// https://github.com/bevyengine/bevy/issues/498
+// TODO: custom coordinate system: 640x480
+
+// TODO: figure out how to remap colors for player and flame animations.
+// for each color there is RMP file in the root bomberman directory.
+// i guess the COLOR.PAL file also has to do something with it,
+// or maybe the palette header in the ANI files?
+
+// TODO: load/hardcode? SOUNDLST.RES for a list of all sounds
 
 #[derive(Debug, PartialEq)]
 enum Direction {
@@ -75,13 +81,8 @@ fn setup(
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut state: ResMut<State>,
 ) {
-    // color is always GREEN how to change to other colors??
-    // is that what the PAL header is for??
-
     // player: STAND.ANI (four perspectives)
     //   WALK.ANI for walking
-
-    //  in "data/ANI/MFLAME.ANI": CIMG 16bpp expected no palette)
 
     // https://stackoverflow.com/questions/65330265/how-can-i-load-all-the-audio-files-inside-a-folder-using-bevy
     // let bundles: Vec<HandleUntyped> = asset_server.load_folder("data/ANI").unwrap();
