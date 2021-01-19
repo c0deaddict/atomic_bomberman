@@ -112,7 +112,7 @@ fn setup(
 
     commands
         .spawn(Camera2dBundle::default())
-        // .spawn(UiCameraComponents::default())        
+        .spawn(UiCameraComponents::default())
         // .spawn(SpriteBundle {
         //     material: materials.add(texture_handle.into()),
         //     transform: Transform::from_scale(Vec3::splat(8.0)),

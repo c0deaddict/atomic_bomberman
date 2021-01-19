@@ -1,7 +1,4 @@
-use atomic_bomberman::{
-    state::*,
-    loading::LoadingPlugin,
-};
+use atomic_bomberman::{loading::LoadingPlugin, state::*};
 use bevy::{
     diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
     prelude::*,
@@ -9,8 +6,12 @@ use bevy::{
 
 fn main() {
     App::build()
-        .add_plugins(DefaultPlugins)
         .add_resource(State::new(AppState::Loading))
+        .add_resource(bevy::log::LogSettings {
+            level: bevy::log::Level::DEBUG,
+            ..Default::default()
+        })
+        .add_plugins(DefaultPlugins)
         .add_stage_after(stage::UPDATE, STAGE, StateStage::<AppState>::default())
         .add_plugin(LoadingPlugin)
         .on_state_enter(STAGE, AppState::Menu, setup_menu.system())
@@ -23,6 +24,7 @@ fn main() {
 // https://github.com/bevyengine/bevy/blob/master/examples/ecs/state.rs
 
 // TODO: custom coordinate system: 640x480
+// could a global transform work?
 
 // TODO: figure out how to remap colors for player and flame animations.
 // for each color there is RMP file in the root bomberman directory.

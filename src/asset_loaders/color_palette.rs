@@ -1,11 +1,9 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use bevy::{
     asset::{AssetLoader, LoadContext, LoadedAsset},
     render::texture::{Extent3d, Texture, TextureDimension, TextureFormat},
     utils::BoxedFuture,
 };
-use byteorder::{ReadBytesExt, LE};
-use std::io::{Cursor, Read};
 
 #[derive(Default)]
 pub struct ColorPaletteAssetLoader;

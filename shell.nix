@@ -1,16 +1,18 @@
-{ nixpkgs ? import <nixpkgs> {} }:
+let
+  sources = import ./nix/sources.nix;
+  pkgs =
+    import sources.nixpkgs { overlays = [ (import sources.rust-overlay) ]; };
 
-with nixpkgs;
-
-mkShell {
+in pkgs.mkShell {
   buildInputs = with pkgs; [
+    rust-bin.nightly.latest.rust
+
     alsaLib
     lutris
     pkgconfig
     vulkan-headers
     vulkan-loader
     vulkan-tools
-    # vulkan-validation-layers
     x11
     xorg.libXcursor
     xorg.libXi
@@ -18,7 +20,11 @@ mkShell {
     libudev
 
     # https://bevyengine.org/learn/book/getting-started/setup/
-    # TODO: not yet using rust nightly
+    clang
     llvmPackages.lld
   ];
+
+  shellHook = ''
+    export RUSTFLAGS="-l vulkan"
+  '';
 }

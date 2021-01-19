@@ -7,7 +7,6 @@ use bevy::{
     utils::BoxedFuture,
 };
 use byteorder::{ReadBytesExt, LE};
-use itertools::Itertools;
 use std::fmt::Debug;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
@@ -552,27 +551,24 @@ impl<'a> Decoder<'a> {
             TextureFormat::Rgba8UnormSrgb,
         );
 
-        let texture_label = "texture";
-        load_context.set_labeled_asset(texture_label, LoadedAsset::new(texture));
-        let texture_path = AssetPath::new_ref(load_context.path(), Some(texture_label));
+        let texture = load_context.set_labeled_asset("texture", LoadedAsset::new(texture));
 
         let texture_atlas = TextureAtlas::from_grid(
-            load_context.get_handle(texture_path),
+            texture,
             Vec2::new(tile_width as f32, tile_height as f32),
             1,
             tile_count,
         );
 
-        let texture_atlas_label = "texture_atlas";
-        load_context.set_labeled_asset(texture_atlas_label, LoadedAsset::new(texture_atlas));
-        let texture_atlas_path = AssetPath::new_ref(load_context.path(), Some(texture_atlas_label));
+        let texture_atlas =
+            load_context.set_labeled_asset("texture_atlas", LoadedAsset::new(texture_atlas));
 
         Ok(AnimationBundle {
             animations,
             tile_width,
             tile_height,
             tile_count,
-            texture_atlas: load_context.get_handle(texture_atlas_path),
+            texture_atlas,
         })
     }
 }
