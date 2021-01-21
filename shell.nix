@@ -5,7 +5,9 @@ let
 
 in pkgs.mkShell {
   buildInputs = with pkgs; [
-    rust-bin.nightly.latest.rust
+    (rust-bin.nightly.latest.rust.override {
+        extensions = [ "rust-src" ];
+    })
 
     alsaLib
     lutris
