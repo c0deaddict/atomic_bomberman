@@ -290,37 +290,29 @@ fn setup_loading(
 
     commands
         .spawn(Camera2dBundle::default())
-        .spawn((
-            Transform::from_scale(Vec3::splat(2.0))
-                .mul_transform(Transform::from_translation(Vec3::new(0., 0., 0.))),
-            GlobalTransform::default(),
-        ))
         .with(WindowTransform)
-        .with_children(|parent| {
-            parent
-                .spawn(SpriteBundle {
-                    material: materials.add(background_handle.into()),
-                    transform: Transform::from_translation(Vec3::new(320., -240., 0.)),
-                    ..Default::default()
-                })
-                .spawn(Text2dBundle {
-                    text: Text {
-                        value: "Loading...".to_string(),
-                        font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                        style: TextStyle {
-                            font_size: 40.0,
-                            color: Color::WHITE,
-                            alignment: TextAlignment {
-                                vertical: VerticalAlign::Center,
-                                horizontal: HorizontalAlign::Center,
-                            },
-                        },
+        .spawn(SpriteBundle {
+            material: materials.add(background_handle.into()),
+            transform: Transform::from_translation(Vec3::new(320., -240., 0.)),
+            ..Default::default()
+        })
+        .spawn(Text2dBundle {
+            text: Text {
+                value: "Loading...".to_string(),
+                font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                style: TextStyle {
+                    font_size: 40.0,
+                    color: Color::WHITE,
+                    alignment: TextAlignment {
+                        vertical: VerticalAlign::Center,
+                        horizontal: HorizontalAlign::Center,
                     },
-                    transform: Transform::from_translation(Vec3::new(320.0, -240.0, 0.)),
-                    ..Default::default()
-                })
-                .with(LoadingText);
-        });
+                },
+            },
+            transform: Transform::from_translation(Vec3::new(320.0, -240.0, 0.)),
+            ..Default::default()
+        })
+        .with(LoadingText);
 
     commands.insert_resource(LoadingData {
         text_entity: commands.current_entity().unwrap(),
@@ -407,10 +399,10 @@ fn window_resize(
     let mut event_reader = resize_event.get_reader();
     for event in event_reader.iter(&resize_event) {
         for mut transform in query.iter_mut() {
-            transform.scale.x = event.width / 640.;
-            transform.scale.y = event.height / 480.;
-            transform.translation.x = -event.width / 2.;
-            transform.translation.y = event.height / 2.;
+            transform.scale.x = 640. / event.width;
+            transform.scale.y = 480. / event.height;
+            transform.translation.x = 320.;
+            transform.translation.y = -240.;
             println!("Info: {:?} {:?}", event, transform);
         }
     }
