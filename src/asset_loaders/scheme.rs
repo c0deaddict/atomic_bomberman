@@ -103,10 +103,7 @@ fn parse(bytes: &[u8]) -> Result<Scheme> {
 
         match parts[0] {
             "V" => scheme.version = parts[1].parse().unwrap(),
-            "N" => {
-                scheme.name = parts[1].to_owned();
-                println!("Scheme {}", scheme.name);
-            }
+            "N" => scheme.name = parts[1].to_owned(),
             "B" => scheme.brick_density = parts[1].parse().unwrap(),
             "R" => {
                 let row: usize = parts[1].parse().unwrap();

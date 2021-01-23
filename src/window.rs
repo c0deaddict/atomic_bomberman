@@ -6,8 +6,15 @@ pub struct WindowPlugin;
 
 impl Plugin for WindowPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.add_startup_system(setup.system())
-            .add_system(window_resize.system());
+        app.add_resource(WindowDescriptor {
+            title: "Atomic Bomberman".to_string(),
+            width: 640. * 2.,
+            height: 480. * 2.,
+            ..Default::default()
+        })
+        .add_resource(ClearColor(Color::rgb(0.04, 0.04, 0.04)))
+        .add_startup_system(setup.system())
+        .add_system(window_resize.system());
     }
 }
 

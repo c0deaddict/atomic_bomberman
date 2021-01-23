@@ -127,11 +127,6 @@ struct FrameImage {
     data: Vec<u8>,
 }
 
-struct Seq {
-    name: String,
-    indices: Vec<usize>,
-}
-
 #[derive(Default, Debug)]
 struct Decoder<'a> {
     cursor: ByteCursor<'a>,
@@ -280,7 +275,7 @@ impl<'a> Decoder<'a> {
     }
 
     /// Each frame consists of a HEAD, followed by a FNAM and a CIMG.
-    fn parse_frame(&mut self, item: Item) -> Result<FrameImage> {
+    fn parse_frame(&mut self) -> Result<FrameImage> {
         // Ignore HEAD.
         self.parse_item(b"HEAD")?.skip(&mut self.cursor)?;
 
@@ -477,7 +472,7 @@ impl<'a> Decoder<'a> {
         let width = frames.iter().map(|f| f.width).max().unwrap();
         let height = frames.iter().map(|f| f.height).max().unwrap();
 
-        println!("loaded animation {}", name);
+        println!("loaded animation {} ({}x{})", name, width, height);
 
         Ok(Animation {
             name,
@@ -502,7 +497,7 @@ impl<'a> Decoder<'a> {
         let mut frames = vec![];
         let mut item = self.read_item()?;
         while item.signature == *b"FRAM" {
-            frames.push(self.parse_frame(item)?);
+            frames.push(self.parse_frame()?);
             item = self.read_item()?;
         }
 

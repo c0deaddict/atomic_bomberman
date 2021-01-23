@@ -13,7 +13,7 @@ fn main() {
     App::build()
         .add_resource(State::new(AppState::Loading))
         .add_resource(bevy::log::LogSettings {
-            level: bevy::log::Level::DEBUG,
+            level: bevy::log::Level::INFO,
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
@@ -24,6 +24,7 @@ fn main() {
         .add_plugin(GamePlugin)
         .add_startup_system(setup.system())
         .add_system(fps_counter_system.system())
+        .add_system(bevy::input::system::exit_on_esc_system.system())
         .run();
 }
 

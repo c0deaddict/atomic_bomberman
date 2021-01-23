@@ -26,7 +26,6 @@ impl AssetLoader for PcxImageAssetLoader {
         Box::pin(async move {
             let mut decoder = PcxDecoder::new(bytes)?;
             let texture = decoder.read_image_data()?;
-            println!("image loaded");
             load_context.set_default_asset(LoadedAsset::new(texture));
             Ok(())
         })

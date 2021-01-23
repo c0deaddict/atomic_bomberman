@@ -3,6 +3,7 @@ use crate::state::*;
 
 use bevy::prelude::*;
 use std::collections::HashMap;
+use std::path::Path;
 
 #[derive(Default)]
 pub struct LoadingPlugin;
@@ -24,7 +25,7 @@ impl Plugin for LoadingPlugin {
 /// All animations listed in DATA/ANI/MASTER.ALI
 const ANIMATION_LIST: &'static [&str] = &[
     // "ALIENS1.ANI",
-    // "BOMBS.ANI",
+    "BOMBS.ANI",
     // "BWALK1.ANI",
     // "BWALK2.ANI",
     // "BWALK3.ANI",
@@ -58,7 +59,7 @@ const ANIMATION_LIST: &'static [&str] = &[
     // "PUP4.ANI",
     // "SHADOW.ANI",
     "STAND.ANI",
-    // "TILES0.ANI",
+    "TILES0.ANI",
     // "TILES1.ANI",
     // "TILES10.ANI",
     // "TILES2.ANI",
@@ -319,14 +320,14 @@ fn setup(
         assets_loading.initial_count += 1;
     }
 
-    // for filename in SOUND_LIST {
-    //     let path = "data/SOUND/".to_owned() + filename;
-    //     let filename = (*filename).to_owned();
-    //     assets_loading
-    //         .sounds
-    //         .insert(filename, asset_server.load(path.as_str()));
-    //     assets_loading.initial_count += 1;
-    // }
+    for filename in SOUND_LIST {
+        let path = "data/SOUND/".to_owned() + filename;
+        let filename = (*filename).to_owned();
+        assets_loading
+            .sounds
+            .insert(filename, asset_server.load(path.as_str()));
+        assets_loading.initial_count += 1;
+    }
 
     assets_loading.schemes = asset_server
         .load_folder("data/SCHEMES")
@@ -339,7 +340,6 @@ fn setup(
 }
 
 fn load_animations(
-    commands: &mut Commands,
     mut assets_loading: ResMut<AssetsLoading>,
     mut named_assets: ResMut<NamedAssets>,
     animation_bundle_assets: Res<Assets<AnimationBundle>>,
@@ -359,7 +359,6 @@ fn load_animations(
 }
 
 fn load_sounds(
-    commands: &mut Commands,
     mut assets_loading: ResMut<AssetsLoading>,
     mut named_assets: ResMut<NamedAssets>,
     sound_assets: Res<Assets<AudioSource>>,
@@ -369,12 +368,17 @@ fn load_sounds(
         .drain_filter(|_filename, handle| sound_assets.contains(handle.clone()));
 
     for (filename, handle) in done {
-        named_assets.sounds.insert(filename, handle);
+        let name = Path::new(&filename)
+            .file_stem()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_lowercase();
+        named_assets.sounds.insert(name, handle);
     }
 }
 
 fn load_schemes(
-    commands: &mut Commands,
     mut assets_loading: ResMut<AssetsLoading>,
     mut named_assets: ResMut<NamedAssets>,
     scheme_assets: Res<Assets<Scheme>>,
@@ -390,7 +394,6 @@ fn load_schemes(
 }
 
 fn loading_progress(
-    commands: &mut Commands,
     mut state: ResMut<State<AppState>>,
     assets_loading: ResMut<AssetsLoading>,
     mut query: Query<&mut Text, With<LoadingText>>,
@@ -413,11 +416,11 @@ fn loading_progress(
 }
 
 fn cleanup(commands: &mut Commands, loading_screen: Res<LoadingScreen>) {
-    trace!("very noisy");
-    debug!("helpful for debugging");
-    info!("helpful information that is worth printing by default");
-    warn!("something bad happened that isn't a failure, but thats worth calling out");
-    error!("something failed");
+    // trace!("very noisy");
+    // debug!("helpful for debugging");
+    // info!("helpful information that is worth printing by default");
+    // warn!("something bad happened that isn't a failure, but thats worth calling out");
+    // error!("something failed");
 
     commands.despawn_recursive(loading_screen.entity);
 }
