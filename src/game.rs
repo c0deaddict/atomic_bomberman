@@ -1,36 +1,20 @@
-use atomic_bomberman::{animated_sprite::*, asset_loaders::*};
-use bevy::{diagnostic::FrameTimeDiagnosticsPlugin, prelude::*};
+use crate::{animated_sprite::*, asset_loaders::*, state::*};
+use bevy::prelude::*;
 use std::cmp::PartialEq;
-use std::env;
 use std::fmt::Debug;
 
-fn main() {
-    App::build()
-        .add_plugins(DefaultPlugins)
-        .add_plugin(FrameTimeDiagnosticsPlugin::default())
-        .add_plugin(CustomAssetLoaders)
-        .add_plugin(AnimatedSpritePlugin)
-        .add_resource(TestTimer(Timer::from_seconds(3.0, true)))
-        .init_resource::<State>()
-        .add_startup_system(setup.system())
-        .add_startup_system(load_and_play_audio.system())
-        .add_system(create_sprite_on_load.system())
-        .add_system(player_movement.system())
-        .add_system(change_sprite.system())
-        .run();
+#[derive(Default)]
+pub struct GamePlugin;
+
+impl Plugin for GamePlugin {
+    fn build(&self, app: &mut AppBuilder) {
+        app.add_plugin(AnimatedSpritePlugin)
+            .on_state_enter(STAGE, AppState::Game, setup.system())
+            .on_state_update(STAGE, AppState::Game, player_movement.system())
+            .on_state_update(STAGE, AppState::Game, change_sprite.system())
+            .on_state_exit(STAGE, AppState::Game, cleanup.system());
+    }
 }
-
-// TODO: menu and asset loading screen
-// https://github.com/bevyengine/bevy/blob/master/examples/ecs/state.rs
-
-// TODO: custom coordinate system: 640x480
-
-// TODO: figure out how to remap colors for player and flame animations.
-// for each color there is RMP file in the root bomberman directory.
-// i guess the COLOR.PAL file also has to do something with it,
-// or maybe the palette header in the ANI files?
-
-// TODO: load/hardcode? SOUNDLST.RES for a list of all sounds
 
 #[derive(Debug, PartialEq)]
 enum Direction {
@@ -41,21 +25,12 @@ enum Direction {
 }
 
 impl Direction {
-    fn next(&self) -> Direction {
+    fn animation(&self) -> &str {
         match self {
-            Direction::North => Direction::East,
-            Direction::East => Direction::South,
-            Direction::South => Direction::West,
-            Direction::West => Direction::North,
-        }
-    }
-
-    fn animation_index(&self) -> usize {
-        match self {
-            Direction::North => 0,
-            Direction::East => 3,
-            Direction::South => 1,
-            Direction::West => 2,
+            Direction::North => "walk north",
+            Direction::East => "walk east",
+            Direction::South => "walk south",
+            Direction::West => "walk west",
         }
     }
 }
@@ -65,148 +40,40 @@ struct Player {}
 #[derive(Debug)]
 struct PlayerDirection(Direction);
 
-struct TestTimer(Timer);
-
-#[derive(Default)]
-struct State {
-    handle: Handle<AnimationBundle>,
-    animation_list: Handle<AnimationList>,
-    loaded: bool,
-}
-
 fn setup(
     commands: &mut Commands,
     asset_server: Res<AssetServer>,
+    // audio: Res<Audio>,
+    named_assets: Res<NamedAssets>,
+    animation_assets: Res<Assets<Animation>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-    mut state: ResMut<State>,
 ) {
     // player: STAND.ANI (four perspectives)
     //   WALK.ANI for walking
 
-    // https://stackoverflow.com/questions/65330265/how-can-i-load-all-the-audio-files-inside-a-folder-using-bevy
-    // let bundles: Vec<HandleUntyped> = asset_server.load_folder("data/ANI").unwrap();
+    let background_handle = asset_server.load("data/RES/FIELD0.PCX");
+    commands.spawn(SpriteBundle {
+        material: materials.add(background_handle.into()),
+        transform: Transform::from_translation(Vec3::new(320., -240., 0.)),
+        ..Default::default()
+    });
 
-    // let texture_handle = asset_server.load("data/RES/MAINMENU.PCX");
-    // let texture_handle = asset_server.load("data/COLOR.PAL");
-
-    state.animation_list = asset_server.load("data/ANI/MASTER.ALI");
-
-    let scheme: Handle<Scheme> = asset_server.load("data/SCHEMES/X.SCH");
-
-    let args: Vec<String> = env::args().collect();
-
-    // problematic:
-    // XPLODE17.ANI
-    // CORNER6.ANI
-    // CONVEYOR.ANI (different dims in SEQ)
-    // data/ANI/CLASSICS.ANI
-    let filename = args
-        .get(1)
-        .map(|s| s.as_str())
-        .unwrap_or("data/ANI/WALK.ANI");
-    state.handle = asset_server.load(filename);
-    // state.handle = asset_server.load("data/ANI/CLASSICS.ANI");
-    // let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(110.0, 110.0), 1, 15);
-    // let texture_atlas_handle = texture_atlases.add(texture_atlas);
-
-    commands
-        .spawn(Camera2dBundle::default())
-        .spawn(UiCameraComponents::default())
-        // .spawn(SpriteBundle {
-        //     material: materials.add(texture_handle.into()),
-        //     transform: Transform::from_scale(Vec3::splat(8.0)),
-        //     ..Default::default()
-        // })
-        ;
-}
-
-fn load_and_play_audio(asset_server: Res<AssetServer>, audio: Res<Audio>) {
     // let music = asset_server.load("data/SOUND/MENU.RSS");
     // audio.play(music);
-}
 
-fn create_sprite_on_load(
-    commands: &mut Commands,
-    mut state: ResMut<State>,
-    animation_assets: ResMut<Assets<AnimationBundle>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-    mut textures: ResMut<Assets<Texture>>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-) {
-    let bundle = animation_assets.get(&state.handle);
-    if state.loaded || bundle.is_none() {
-        return;
-    }
-
-    let bundle = bundle.unwrap();
-
-    // for (i, animation) in bundle.animations.iter().cycle().take(12 * 8).enumerate() {
-    //     let x = -(80. * 6.) + (i % 12) as f32 * 80.0;
-    //     let y = -(80. * 4.) + (i / 12) as f32 * 80.0;
-    //     commands
-    //         // .spawn(Player::default())
-    //         .spawn(SpriteSheetBundle {
-    //             texture_atlas: bundle.texture_atlas.clone(),
-    //             transform: Transform::from_scale(Vec3::splat(2.0))
-    //                 .mul_transform(Transform::from_translation(Vec3::new(x, y, 0.0))),
-    //             ..Default::default()
-    //         })
-    //         .with(AnimateSprite {
-    //             animation: animation.clone(),
-    //             index: 0, // i % animation.frames.len(),
-    //         })
-    //         .with(Timer::from_seconds(1. / 25., true));
-    // }
-
-    let animation = &bundle.animations[0];
+    let direction = Direction::North;
+    let animation = named_assets.animations.get(direction.animation()).unwrap();
 
     commands
         .spawn((
-            Transform::from_translation(Vec3::new(-50.0, 0.0, 0.0)),
+            Transform::from_translation(Vec3::new(320., -240., 0.0)),
             GlobalTransform::default(),
             Player {},
-            PlayerDirection(Direction::North),
+            PlayerDirection(direction),
         ))
         .with_children(|parent| {
-            AnimatedSprite::spawn_child(parent, &bundle, animation);
+            AnimatedSprite::spawn_child(parent, animation.clone(), &animation_assets);
         });
-
-    state.loaded = true;
-}
-
-// NOTE: systems with Changed<> must be added AFTER the system that triggers the change.
-fn change_sprite(
-    commands: &mut Commands,
-    time: Res<Time>,
-    animation_assets: ResMut<Assets<AnimationBundle>>,
-    mut state: Res<State>,
-    mut timer: ResMut<TestTimer>,
-    mut query: Query<(Entity, &Children, &PlayerDirection), Changed<PlayerDirection>>,
-) {
-    let bundle = animation_assets.get(&state.handle);
-    if bundle.is_none() {
-        return;
-    }
-
-    let bundle = bundle.unwrap();
-
-    for (entity, children, direction) in query.iter_mut() {
-        println!("direction changed to: {:?}", direction.0);
-
-        let child = children.first().copied().unwrap();
-        commands.despawn_recursive(child);
-
-        let animation = &bundle.animations[direction.0.animation_index()];
-        println!("animation {}", animation.name);
-
-        // only add timer if frames.length > 1
-        let child = AnimatedSprite::spawn(commands, &bundle, animation)
-            .current_entity()
-            .unwrap();
-
-        commands.push_children(entity, &[child]);
-    }
 }
 
 fn player_movement(
@@ -241,12 +108,33 @@ fn player_movement(
     }
 }
 
-// https://github.com/bevyengine/bevy/pull/273
+// NOTE: systems with Changed<> must be added AFTER the system that triggers the change.
+fn change_sprite(
+    commands: &mut Commands,
+    named_assets: Res<NamedAssets>,
+    animation_assets: Res<Assets<Animation>>,
+    mut query: Query<(Entity, &Children, &PlayerDirection), Changed<PlayerDirection>>,
+) {
+    for (entity, children, direction) in query.iter_mut() {
+        println!("direction changed to: {:?}", direction.0);
 
-// fn counter_system(diagnostics: Res<Diagnostics>, mut text: Mut<Text>) {
-//     if let Some(fps) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
-//         if let Some(average) = fps.average() {
-//             text.value = format!("FPS: {:.2}", average);
-//         }
-//     };
-// }
+        if let Some(child) = children.first().copied() {
+            commands.despawn_recursive(child);
+        }
+
+        let animation = named_assets
+            .animations
+            .get(direction.0.animation())
+            .unwrap();
+
+        let child = AnimatedSprite::spawn(commands, animation.clone(), &animation_assets)
+            .current_entity()
+            .unwrap();
+
+        commands.push_children(entity, &[child]);
+    }
+}
+
+fn cleanup(commands: &mut Commands) {
+    // commands.despawn_recursive(loading_state.text_entity);
+}

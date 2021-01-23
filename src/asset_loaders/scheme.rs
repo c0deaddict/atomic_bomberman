@@ -46,7 +46,7 @@ pub type Grid = [[Cell; 15]; 11];
 #[derive(Debug, Default)]
 pub struct PowerupInfo {
     pub born_with: bool,
-    pub override_value: Option<u8>,
+    pub override_value: Option<i8>,
     pub forbidden: bool,
 }
 
@@ -103,7 +103,10 @@ fn parse(bytes: &[u8]) -> Result<Scheme> {
 
         match parts[0] {
             "V" => scheme.version = parts[1].parse().unwrap(),
-            "N" => scheme.name = parts[1].to_owned(),
+            "N" => {
+                scheme.name = parts[1].to_owned();
+                println!("Scheme {}", scheme.name);
+            }
             "B" => scheme.brick_density = parts[1].parse().unwrap(),
             "R" => {
                 let row: usize = parts[1].parse().unwrap();

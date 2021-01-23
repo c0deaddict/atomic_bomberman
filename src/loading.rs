@@ -2,7 +2,6 @@ use crate::asset_loaders::*;
 use crate::state::*;
 
 use bevy::prelude::*;
-use bevy::window::WindowResized;
 use std::collections::HashMap;
 
 #[derive(Default)]
@@ -11,95 +10,95 @@ pub struct LoadingPlugin;
 impl Plugin for LoadingPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_plugin(CustomAssetLoaders)
-            .init_resource::<LoadingState>()
-            .init_resource::<Resources>()
-            .add_system(window_resize.system())
-            .on_state_enter(STAGE, AppState::Loading, setup_loading.system())
+            .init_resource::<AssetsLoading>()
+            .init_resource::<NamedAssets>()
+            .on_state_enter(STAGE, AppState::Loading, setup.system())
             .on_state_update(STAGE, AppState::Loading, load_animations.system())
             .on_state_update(STAGE, AppState::Loading, load_sounds.system())
+            .on_state_update(STAGE, AppState::Loading, load_schemes.system())
             .on_state_update(STAGE, AppState::Loading, loading_progress.system())
-            .on_state_exit(STAGE, AppState::Loading, cleanup_loading.system());
+            .on_state_exit(STAGE, AppState::Loading, cleanup.system());
     }
 }
 
 /// All animations listed in DATA/ANI/MASTER.ALI
 const ANIMATION_LIST: &'static [&str] = &[
-    "ALIENS1.ANI",
-    "BOMBS.ANI",
-    "BWALK1.ANI",
-    "BWALK2.ANI",
-    "BWALK3.ANI",
-    "BWALK4.ANI",
-    "CONVEYOR.ANI",
-    "CORNER0.ANI",
-    "CORNER1.ANI",
-    "CORNER2.ANI",
-    "CORNER3.ANI",
-    "CORNER4.ANI",
-    "CORNER5.ANI",
-    "CORNER6.ANI",
-    "CORNER7.ANI",
-    "DUDS.ANI",
-    "EDIT.ANI",
-    "EXTRAS.ANI",
-    "HURRY.ANI",
-    "KFACE.ANI",
-    "KFONT.ANI",
-    "KICK.ANI",
-    "MFLAME.ANI",
-    "MISC.ANI",
-    "POWERS.ANI",
-    "PUNBOMB1.ANI",
-    "PUNBOMB2.ANI",
-    "PUNBOMB3.ANI",
-    "PUNBOMB4.ANI",
-    "PUP1.ANI",
-    "PUP2.ANI",
-    "PUP3.ANI",
-    "PUP4.ANI",
-    "SHADOW.ANI",
+    // "ALIENS1.ANI",
+    // "BOMBS.ANI",
+    // "BWALK1.ANI",
+    // "BWALK2.ANI",
+    // "BWALK3.ANI",
+    // "BWALK4.ANI",
+    // "CONVEYOR.ANI",
+    // "CORNER0.ANI",
+    // "CORNER1.ANI",
+    // "CORNER2.ANI",
+    // "CORNER3.ANI",
+    // "CORNER4.ANI",
+    // "CORNER5.ANI",
+    // "CORNER6.ANI",
+    // "CORNER7.ANI",
+    // "DUDS.ANI",
+    // "EDIT.ANI",
+    // "EXTRAS.ANI",
+    // "HURRY.ANI",
+    // "KFACE.ANI",
+    // "KFONT.ANI",
+    // "KICK.ANI",
+    // "MFLAME.ANI",
+    // "MISC.ANI",
+    // "POWERS.ANI",
+    // "PUNBOMB1.ANI",
+    // "PUNBOMB2.ANI",
+    // "PUNBOMB3.ANI",
+    // "PUNBOMB4.ANI",
+    // "PUP1.ANI",
+    // "PUP2.ANI",
+    // "PUP3.ANI",
+    // "PUP4.ANI",
+    // "SHADOW.ANI",
     "STAND.ANI",
-    "TILES0.ANI",
-    "TILES1.ANI",
-    "TILES10.ANI",
-    "TILES2.ANI",
-    "TILES3.ANI",
-    "TILES4.ANI",
-    "TILES5.ANI",
-    "TILES6.ANI",
-    "TILES7.ANI",
-    "TILES8.ANI",
-    "TILES9.ANI",
-    "TRIGANIM.ANI",
+    // "TILES0.ANI",
+    // "TILES1.ANI",
+    // "TILES10.ANI",
+    // "TILES2.ANI",
+    // "TILES3.ANI",
+    // "TILES4.ANI",
+    // "TILES5.ANI",
+    // "TILES6.ANI",
+    // "TILES7.ANI",
+    // "TILES8.ANI",
+    // "TILES9.ANI",
+    // "TRIGANIM.ANI",
     "WALK.ANI",
-    "XBRICK0.ANI",
-    "XBRICK1.ANI",
-    "XBRICK10.ANI",
-    "XBRICK2.ANI",
-    "XBRICK3.ANI",
-    "XBRICK4.ANI",
-    "XBRICK5.ANI",
-    "XBRICK6.ANI",
-    "XBRICK7.ANI",
-    "XBRICK8.ANI",
-    "XBRICK9.ANI",
-    "XPLODE1.ANI",
-    "XPLODE10.ANI",
-    "XPLODE11.ANI",
-    "XPLODE12.ANI",
-    "XPLODE13.ANI",
-    "XPLODE14.ANI",
-    "XPLODE15.ANI",
-    "XPLODE16.ANI",
-    "XPLODE17.ANI",
-    "XPLODE2.ANI",
-    "XPLODE3.ANI",
-    "XPLODE4.ANI",
-    "XPLODE5.ANI",
-    "XPLODE6.ANI",
-    "XPLODE7.ANI",
-    "XPLODE8.ANI",
-    "XPLODE9.ANI",
+    // "XBRICK0.ANI",
+    // "XBRICK1.ANI",
+    // "XBRICK10.ANI",
+    // "XBRICK2.ANI",
+    // "XBRICK3.ANI",
+    // "XBRICK4.ANI",
+    // "XBRICK5.ANI",
+    // "XBRICK6.ANI",
+    // "XBRICK7.ANI",
+    // "XBRICK8.ANI",
+    // "XBRICK9.ANI",
+    // "XPLODE1.ANI",
+    // "XPLODE10.ANI",
+    // "XPLODE11.ANI",
+    // "XPLODE12.ANI",
+    // "XPLODE13.ANI",
+    // "XPLODE14.ANI",
+    // "XPLODE15.ANI",
+    // "XPLODE16.ANI",
+    // "XPLODE17.ANI",
+    // "XPLODE2.ANI",
+    // "XPLODE3.ANI",
+    // "XPLODE4.ANI",
+    // "XPLODE5.ANI",
+    // "XPLODE6.ANI",
+    // "XPLODE7.ANI",
+    // "XPLODE8.ANI",
+    // "XPLODE9.ANI",
 ];
 
 /// All sounds listed in DATA/RES/SOUNDLST.RES
@@ -259,161 +258,166 @@ const SOUND_LIST: &'static [&str] = &[
 ];
 
 #[derive(Default)]
-struct LoadingState {
-    animations_loading: Vec<Handle<AnimationBundle>>,
-    sounds_loading: HashMap<String, Handle<AudioSource>>,
-    total_assets: usize,
-}
-
-#[derive(Default)]
-struct Resources {
-    animations: HashMap<String, Animation>,
+struct AssetsLoading {
+    animations: Vec<Handle<AnimationBundle>>,
     sounds: HashMap<String, Handle<AudioSource>>,
-}
-
-struct LoadingData {
-    text_entity: Entity,
+    schemes: Vec<Handle<Scheme>>,
+    initial_count: usize,
 }
 
 struct LoadingText;
-struct WindowTransform;
 
-fn setup_loading(
+struct LoadingScreen {
+    entity: Entity,
+}
+
+fn setup(
     commands: &mut Commands,
     asset_server: Res<AssetServer>,
-    mut loading_state: ResMut<LoadingState>,
+    mut assets_loading: ResMut<AssetsLoading>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    // TODO: show image like GLUE2.PCX as background?
     // TODO: which font is used in the original game?
     let background_handle = asset_server.load("data/RES/GLUE2.PCX");
 
     commands
-        .spawn(Camera2dBundle::default())
-        .with(WindowTransform)
         .spawn(SpriteBundle {
             material: materials.add(background_handle.into()),
             transform: Transform::from_translation(Vec3::new(320., -240., 0.)),
             ..Default::default()
         })
-        .spawn(Text2dBundle {
-            text: Text {
-                value: "Loading...".to_string(),
-                font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                style: TextStyle {
-                    font_size: 40.0,
-                    color: Color::WHITE,
-                    alignment: TextAlignment {
-                        vertical: VerticalAlign::Center,
-                        horizontal: HorizontalAlign::Center,
+        .with_children(|parent| {
+            parent
+                .spawn(Text2dBundle {
+                    text: Text {
+                        value: "Loading...".to_string(),
+                        font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                        style: TextStyle {
+                            font_size: 40.0,
+                            color: Color::WHITE,
+                            alignment: TextAlignment {
+                                vertical: VerticalAlign::Center,
+                                horizontal: HorizontalAlign::Center,
+                            },
+                        },
                     },
-                },
-            },
-            transform: Transform::from_translation(Vec3::new(320.0, -240.0, 0.)),
-            ..Default::default()
-        })
-        .with(LoadingText);
+                    transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                    ..Default::default()
+                })
+                .with(LoadingText);
+        });
 
-    commands.insert_resource(LoadingData {
-        text_entity: commands.current_entity().unwrap(),
+    commands.insert_resource(LoadingScreen {
+        entity: commands.current_entity().unwrap(),
     });
 
     for filename in ANIMATION_LIST {
         let path = "data/ANI/".to_owned() + filename;
-        loading_state
-            .animations_loading
+        assets_loading
+            .animations
             .push(asset_server.load(path.as_str()));
-        loading_state.total_assets += 1;
+        assets_loading.initial_count += 1;
     }
 
-    for filename in SOUND_LIST {
-        let path = "data/SOUND/".to_owned() + filename;
-        let filename = (*filename).to_owned();
-        loading_state
-            .sounds_loading
-            .insert(filename, asset_server.load(path.as_str()));
-        loading_state.total_assets += 1;
-    }
+    // for filename in SOUND_LIST {
+    //     let path = "data/SOUND/".to_owned() + filename;
+    //     let filename = (*filename).to_owned();
+    //     assets_loading
+    //         .sounds
+    //         .insert(filename, asset_server.load(path.as_str()));
+    //     assets_loading.initial_count += 1;
+    // }
+
+    assets_loading.schemes = asset_server
+        .load_folder("data/SCHEMES")
+        .unwrap()
+        .drain(..)
+        .map(|handle| handle.typed())
+        .collect();
+
+    assets_loading.initial_count += assets_loading.schemes.len();
 }
 
 fn load_animations(
     commands: &mut Commands,
-    mut loading_state: ResMut<LoadingState>,
-    mut resources: ResMut<Resources>,
+    mut assets_loading: ResMut<AssetsLoading>,
+    mut named_assets: ResMut<NamedAssets>,
     animation_bundle_assets: Res<Assets<AnimationBundle>>,
 ) {
-    let done = loading_state
-        .animations_loading
+    let done = assets_loading
+        .animations
         .drain_filter(|handle| animation_bundle_assets.contains(handle.clone()));
 
     for handle in done {
         let bundle = animation_bundle_assets.get(handle).unwrap();
-        for animation in bundle.animations.iter() {
-            resources
+        for (name, animation_handle) in bundle.animations.iter() {
+            named_assets
                 .animations
-                .insert(animation.name.clone(), animation.clone());
+                .insert(name.clone(), animation_handle.clone());
         }
     }
 }
 
 fn load_sounds(
     commands: &mut Commands,
-    mut loading_state: ResMut<LoadingState>,
-    mut resources: ResMut<Resources>,
+    mut assets_loading: ResMut<AssetsLoading>,
+    mut named_assets: ResMut<NamedAssets>,
     sound_assets: Res<Assets<AudioSource>>,
 ) {
-    let done = loading_state
-        .sounds_loading
+    let done = assets_loading
+        .sounds
         .drain_filter(|_filename, handle| sound_assets.contains(handle.clone()));
 
     for (filename, handle) in done {
-        resources.sounds.insert(filename, handle);
+        named_assets.sounds.insert(filename, handle);
+    }
+}
+
+fn load_schemes(
+    commands: &mut Commands,
+    mut assets_loading: ResMut<AssetsLoading>,
+    mut named_assets: ResMut<NamedAssets>,
+    scheme_assets: Res<Assets<Scheme>>,
+) {
+    let done = assets_loading
+        .schemes
+        .drain_filter(|handle| scheme_assets.contains(handle.clone()));
+
+    for handle in done {
+        let scheme = scheme_assets.get(handle.clone()).unwrap();
+        named_assets.schemes.insert(scheme.name.clone(), handle);
     }
 }
 
 fn loading_progress(
     commands: &mut Commands,
     mut state: ResMut<State<AppState>>,
-    loading_state: ResMut<LoadingState>,
+    assets_loading: ResMut<AssetsLoading>,
     mut query: Query<&mut Text, With<LoadingText>>,
 ) {
-    let remaining = loading_state.animations_loading.len() + loading_state.sounds_loading.len();
-    let assets_loaded = loading_state.total_assets - remaining;
+    let remaining_count = assets_loading.animations.len()
+        + assets_loading.sounds.len()
+        + assets_loading.schemes.len();
+    let assets_loaded = assets_loading.initial_count - remaining_count;
 
     for mut text in query.iter_mut() {
         text.value = format!(
             "Loading {}/{} assets",
-            assets_loaded, loading_state.total_assets
+            assets_loaded, assets_loading.initial_count
         );
     }
 
-    if assets_loaded == loading_state.total_assets {
-        // state.set_next(AppState::Menu).unwrap();
+    if assets_loaded == assets_loading.initial_count {
+        state.set_next(AppState::Game).unwrap();
     }
 }
 
-fn window_resize(
-    resize_event: Res<Events<WindowResized>>,
-    mut query: Query<&mut Transform, With<WindowTransform>>,
-) {
-    let mut event_reader = resize_event.get_reader();
-    for event in event_reader.iter(&resize_event) {
-        for mut transform in query.iter_mut() {
-            transform.scale.x = 640. / event.width;
-            transform.scale.y = 480. / event.height;
-            transform.translation.x = 320.;
-            transform.translation.y = -240.;
-            println!("Info: {:?} {:?}", event, transform);
-        }
-    }
-}
-
-fn cleanup_loading(commands: &mut Commands, loading_data: Res<LoadingData>) {
+fn cleanup(commands: &mut Commands, loading_screen: Res<LoadingScreen>) {
     trace!("very noisy");
     debug!("helpful for debugging");
     info!("helpful information that is worth printing by default");
     warn!("something bad happened that isn't a failure, but thats worth calling out");
     error!("something failed");
 
-    commands.despawn_recursive(loading_data.text_entity);
+    commands.despawn_recursive(loading_screen.entity);
 }

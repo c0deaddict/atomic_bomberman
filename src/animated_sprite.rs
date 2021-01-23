@@ -1,4 +1,4 @@
-use crate::asset_loaders::{Animation, AnimationBundle};
+use crate::asset_loaders::Animation;
 use bevy::prelude::*;
 
 #[derive(Default)]
@@ -11,8 +11,7 @@ impl Plugin for AnimatedSpritePlugin {
 }
 
 pub struct AnimatedSprite {
-    // TODO: Handle<Animation>?
-    pub animation: Animation,
+    pub animation: Handle<Animation>,
     pub index: usize,
     // TODO: playing: bool
     // TODO: speed: float (fps?)
@@ -24,13 +23,14 @@ pub struct AnimatedSprite {
 impl AnimatedSprite {
     pub fn spawn<'a>(
         commands: &'a mut Commands,
-        bundle: &AnimationBundle,
-        animation: &Animation,
+        animation: Handle<Animation>,
+        animation_assets: &Assets<Animation>,
     ) -> &'a Commands {
+        let asset = animation_assets.get(&animation).unwrap();
         commands
             .spawn(SpriteSheetBundle {
-                texture_atlas: bundle.texture_atlas.clone(),
-                sprite: TextureAtlasSprite::new(animation.frames[0].index as u32),
+                texture_atlas: asset.atlas.texture.clone(),
+                sprite: TextureAtlasSprite::new(asset.frames[0].index as u32),
                 ..Default::default()
             })
             .with(AnimatedSprite {
@@ -43,13 +43,14 @@ impl AnimatedSprite {
 
     pub fn spawn_child<'a>(
         commands: &'a mut ChildBuilder,
-        bundle: &AnimationBundle,
-        animation: &Animation,
+        animation: Handle<Animation>,
+        animation_assets: &Assets<Animation>,
     ) -> &'a ChildBuilder<'a> {
+        let asset = animation_assets.get(&animation).unwrap();
         commands
             .spawn(SpriteSheetBundle {
-                texture_atlas: bundle.texture_atlas.clone(),
-                sprite: TextureAtlasSprite::new(animation.frames[0].index as u32),
+                texture_atlas: asset.atlas.texture.clone(),
+                sprite: TextureAtlasSprite::new(asset.frames[0].index as u32),
                 ..Default::default()
             })
             .with(AnimatedSprite {
@@ -64,13 +65,14 @@ impl AnimatedSprite {
 fn animate_sprite(
     time: Res<Time>,
     mut query: Query<(&mut Timer, &mut TextureAtlasSprite, &mut AnimatedSprite)>,
+    animation_assets: Res<Assets<Animation>>,
 ) {
     for (mut timer, mut sprite, mut animate_sprite) in query.iter_mut() {
+        let animation = animation_assets.get(&animate_sprite.animation).unwrap();
         timer.tick(time.delta_seconds());
         if timer.finished() {
-            animate_sprite.index =
-                (animate_sprite.index + 1) % animate_sprite.animation.frames.len();
-            sprite.index = animate_sprite.animation.frames[animate_sprite.index].index as u32;
+            animate_sprite.index = (animate_sprite.index + 1) % animation.frames.len();
+            sprite.index = animation.frames[animate_sprite.index].index as u32;
         }
     }
 }

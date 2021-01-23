@@ -1,12 +1,13 @@
 use anyhow::{bail, Result};
 use bevy::{
-    asset::{AssetLoader, AssetPath, Handle, LoadContext, LoadedAsset},
+    asset::{AssetLoader, Handle, LoadContext, LoadedAsset},
     prelude::*,
     reflect::TypeUuid,
     render::texture::{Extent3d, TextureDimension, TextureFormat},
     utils::BoxedFuture,
 };
 use byteorder::{ReadBytesExt, LE};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
@@ -28,21 +29,27 @@ pub struct Frame {
 }
 
 #[derive(Debug, Clone)]
+pub struct AnimationAtlas {
+    pub tile_width: u32,
+    pub tile_height: u32,
+    pub tile_count: usize,
+    pub texture: Handle<TextureAtlas>,
+}
+
+#[derive(Debug, TypeUuid)]
+#[uuid = "e1e9f49e-4fcd-464d-bb04-c8e60cf00422"]
 pub struct Animation {
     pub name: String,
     pub width: u32,
     pub height: u32,
     pub frames: Vec<Frame>,
+    pub atlas: AnimationAtlas,
 }
 
 #[derive(Debug, TypeUuid)]
 #[uuid = "56c38dde-6ab4-4d02-93c1-976a7fa8dea2"]
 pub struct AnimationBundle {
-    pub tile_width: u32,
-    pub tile_height: u32,
-    pub tile_count: usize,
-    pub animations: Vec<Animation>,
-    pub texture_atlas: Handle<TextureAtlas>,
+    pub animations: HashMap<String, Handle<Animation>>,
 }
 
 impl AssetLoader for AnimationAssetLoader {
@@ -345,35 +352,26 @@ impl<'a> Decoder<'a> {
 
         let data: Vec<u8> = if bits_per_pixel == 16 {
             if palette_size.is_some() {
-                println!("{:?}", palette.unwrap());
-                println!(
-                    "CIMG 16bpp expected no palette, size found {}",
-                    palette_size.unwrap()
-                );
+                // println!("{:?}", palette.unwrap());
+                // println!(
+                //     "CIMG 16bpp expected no palette, size found {}",
+                //     palette_size.unwrap()
+                // );
             }
-
-            let raw_data: Vec<u16> = TgaRleIterator::new(&mut self.cursor)
-                .take((width * height) as usize)
-                .collect();
-
-            // println!("{:?}", raw_data.iter().sorted().dedup().map(|v| format!("{:04x}", v)).collect::<Vec<String>>());
 
             // Convert the 16 bit color values to 32bit RGBA. The 16 bit pixel
             // format has support for an alpha channel (the highest bit) but
             // that is not used. Instead alpha is set to all pixels that match
             // `transparent`.
-            raw_data
-                .iter()
-                .flat_map(|v| {
-                    if *v == transparent || v & 0b1000_0000_0000_0000 != 0 {
+            TgaRleIterator::new(&mut self.cursor)
+                .take((width * height) as usize)
+                .flat_map(|v: u16| {
+                    if v == transparent || v & 0b1000_0000_0000_0000 != 0 {
                         vec![0, 0, 0, 0]
                     } else {
                         let r = (((v & 0b0111_1100_0000_0000) >> 10) << 3) as u8;
                         let g = (((v & 0b0000_0011_1110_0000) >> 5) << 3) as u8;
                         let b = ((v & 0b0000_0000_0001_1111) << 3) as u8;
-                        // if g > 128 && r < 128 && b < 128 {
-                        //     println!("{:02x},{:02x},{:02x} {:04x}", r,g,b,v);
-                        // }
                         vec![r, g, b, 255]
                     }
                 })
@@ -419,7 +417,12 @@ impl<'a> Decoder<'a> {
     /// Sequences are composed of a HEAD followed by one or more STAT items.
     /// The HEAD contains the "name". Each STAT item contains a HEAD (which we
     /// ignore) and a FRAM. The FRAM contains a "frame index".
-    fn parse_animation(&mut self, seq: Item, frame_images: &[FrameImage]) -> Result<Animation> {
+    fn parse_animation(
+        &mut self,
+        seq: Item,
+        frame_images: &[FrameImage],
+        atlas: AnimationAtlas,
+    ) -> Result<Animation> {
         let mut item = self.read_item()?;
         if item.signature != *b"HEAD" {
             bail!("Expected a HEAD item inside SEQ");
@@ -481,6 +484,7 @@ impl<'a> Decoder<'a> {
             frames,
             width,
             height,
+            atlas,
         })
     }
 
@@ -502,18 +506,25 @@ impl<'a> Decoder<'a> {
             item = self.read_item()?;
         }
 
+        let tile_width = frames.iter().map(|i| i.width).max().unwrap();
+        let tile_height = frames.iter().map(|i| i.height).max().unwrap();
+        let tile_count = frames.len();
+
+        let atlas = AnimationAtlas {
+            tile_width,
+            tile_height,
+            tile_count,
+            texture: Default::default(),
+        };
+
         let mut animations = vec![];
         while item.signature == *b"SEQ " {
-            animations.push(self.parse_animation(item, &frames)?);
+            animations.push(self.parse_animation(item, &frames, atlas.clone())?);
             if self.cursor.position() >= self.file_end {
                 break;
             }
             item = self.read_item()?;
         }
-
-        let tile_width = frames.iter().map(|i| i.width).max().unwrap();
-        let tile_height = frames.iter().map(|i| i.height).max().unwrap();
-        let tile_count = frames.len();
 
         // Build sprite sheet in vertical direction. Vertical because that
         // allows us to just concat all the image data together.
@@ -552,7 +563,6 @@ impl<'a> Decoder<'a> {
         );
 
         let texture = load_context.set_labeled_asset("texture", LoadedAsset::new(texture));
-
         let texture_atlas = TextureAtlas::from_grid(
             texture,
             Vec2::new(tile_width as f32, tile_height as f32),
@@ -560,15 +570,20 @@ impl<'a> Decoder<'a> {
             tile_count,
         );
 
-        let texture_atlas =
+        let texture_atlas_handle =
             load_context.set_labeled_asset("texture_atlas", LoadedAsset::new(texture_atlas));
 
-        Ok(AnimationBundle {
-            animations,
-            tile_width,
-            tile_height,
-            tile_count,
-            texture_atlas,
-        })
+        // Bind texture atlas in all animations and wrap them in an asset.
+        let animations = animations
+            .drain(..)
+            .map(|mut animation| {
+                animation.atlas.texture = texture_atlas_handle.clone();
+                let name = animation.name.clone();
+                let handle = load_context.set_labeled_asset(&name, LoadedAsset::new(animation));
+                (name, handle)
+            })
+            .collect();
+
+        Ok(AnimationBundle { animations })
     }
 }
