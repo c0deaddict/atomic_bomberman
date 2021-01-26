@@ -19,7 +19,7 @@ impl Plugin for GamePlugin {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Direction {
     North,
     South,
@@ -42,6 +42,9 @@ struct PlayerDirection {
     direction: Direction,
     walking: bool,
 }
+
+#[derive(Default)]
+struct KeyboardMovement(Vec<Direction>);
 
 impl PlayerDirection {
     fn animation(&self) -> String {
@@ -94,15 +97,26 @@ fn setup(
 
     commands
         .spawn((
-            Transform::from_translation(Vec3::new(320., -240., 0.0)),
+            Transform::from_translation(Vec3::new(320., -240., 1.0)),
             GlobalTransform::default(),
         ))
         .with(Player {})
         .with(player_direction)
+        .with(KeyboardMovement::default())
         .with(Pos { x: 0, y: 0 })
         .with(Bombs(vec![]))
         .with(Timer::from_seconds(1. / 60., true))
         .with_children(|parent| {
+            let shadow = named_assets.animations.get("shadow").unwrap();
+            // TODO: make a bundle or something for this. this is ugly.
+            parent
+                .spawn((
+                    Transform::from_translation(Vec3::new(0.0, -35.0, 0.0)),
+                    GlobalTransform::default(),
+                ))
+                .with_children(|parent| {
+                    AnimatedSprite::spawn_child(parent, shadow.clone(), &animation_assets);
+                });
             AnimatedSprite::spawn_child(parent, animation.clone(), &animation_assets);
         });
 
@@ -155,23 +169,29 @@ fn key_to_direction(key_code: &KeyCode) -> Option<Direction> {
 
 fn keyboard_handling(
     mut keyboard_events: EventReader<KeyboardInput>,
-    mut query: Query<(&mut PlayerDirection, &Pos)>,
+    mut query: Query<(&mut PlayerDirection, &mut KeyboardMovement, &Pos)>,
     mut place_bomb_events: ResMut<Events<PlaceBombEvent>>,
 ) {
     // TODO: need to remember which keys are pressed.
     // maybe the naive input handling is enough?
-    for (mut player_direction, pos) in query.iter_mut() {
+    for (mut player_direction, mut keyboard_movement, pos) in query.iter_mut() {
         for event in keyboard_events.iter() {
             if let Some(key_code) = event.key_code {
-                if let Some(new_direction) = key_to_direction(&key_code) {
+                if let Some(direction) = key_to_direction(&key_code) {
                     if event.state.is_pressed() {
-                        if player_direction.direction != new_direction {
-                            player_direction.direction = new_direction;
+                        keyboard_movement.0.push(direction);
+                    } else {
+                        keyboard_movement.0.retain(|&x| x != direction);
+                    }
+
+                    if let Some(new_direction) = keyboard_movement.0.last() {
+                        if &player_direction.direction != new_direction {
+                            player_direction.direction = *new_direction;
                         }
                         if !player_direction.walking {
                             player_direction.walking = true;
                         }
-                    } else if player_direction.direction == new_direction {
+                    } else if player_direction.walking {
                         player_direction.walking = false;
                     }
                 } else if event.state.is_pressed() && key_code == KeyCode::Space {
@@ -254,10 +274,10 @@ fn change_sprite(
     commands: &mut Commands,
     named_assets: Res<NamedAssets>,
     animation_assets: Res<Assets<Animation>>,
-    mut query: Query<(Entity, &Children, &PlayerDirection), Changed<PlayerDirection>>,
+    mut query: Query<(Entity, &mut Children, &PlayerDirection), Changed<PlayerDirection>>,
 ) {
     for (entity, children, player_direction) in query.iter_mut() {
-        if let Some(child) = children.first().copied() {
+        if let Some(child) = children.last().copied() {
             commands.despawn_recursive(child);
         }
 

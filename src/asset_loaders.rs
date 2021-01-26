@@ -3,7 +3,7 @@ mod pcx_image;
 mod raw_sound;
 mod scheme;
 
-use crate::animation::{AnimationAssetLoader, Animation, AnimationBundle};
+use crate::animation::{Animation, AnimationAssetLoader, AnimationBundle};
 use color_palette::ColorPaletteAssetLoader;
 use pcx_image::PcxImageAssetLoader;
 use raw_sound::RawSoundAssetLoader;

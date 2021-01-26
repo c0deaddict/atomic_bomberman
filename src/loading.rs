@@ -1,5 +1,5 @@
-use crate::asset_loaders::*;
 use crate::animation::*;
+use crate::asset_loaders::*;
 use crate::state::*;
 
 use bevy::prelude::*;
@@ -58,7 +58,7 @@ const ANIMATION_LIST: &'static [&str] = &[
     // "PUP2.ANI",
     // "PUP3.ANI",
     // "PUP4.ANI",
-    // "SHADOW.ANI",
+    "SHADOW.ANI",
     "STAND.ANI",
     "TILES0.ANI",
     // "TILES1.ANI",
