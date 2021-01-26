@@ -28,7 +28,7 @@ pub enum Powerup {
     Random = 12,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Cell {
     Solid,
     Brick,

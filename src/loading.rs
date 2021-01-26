@@ -1,4 +1,5 @@
 use crate::asset_loaders::*;
+use crate::animation::*;
 use crate::state::*;
 
 use bevy::prelude::*;

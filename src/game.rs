@@ -1,5 +1,5 @@
-use crate::{animated_sprite::*, asset_loaders::*, state::*};
-use bevy::prelude::*;
+use crate::{animation::*, asset_loaders::*, state::*};
+use bevy::{input::keyboard::KeyboardInput, prelude::*};
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
 
@@ -9,7 +9,9 @@ pub struct GamePlugin;
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_plugin(AnimatedSpritePlugin)
+            .add_event::<PlaceBombEvent>()
             .on_state_enter(STAGE, AppState::Game, setup.system())
+            .on_state_update(STAGE, AppState::Game, keyboard_handling.system())
             .on_state_update(STAGE, AppState::Game, player_movement.system())
             .on_state_update(STAGE, AppState::Game, place_bomb.system())
             .on_state_update(STAGE, AppState::Game, change_sprite.system())
@@ -17,23 +19,12 @@ impl Plugin for GamePlugin {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 enum Direction {
     North,
     South,
     East,
     West,
-}
-
-impl Direction {
-    fn animation(&self) -> &str {
-        match self {
-            Direction::North => "walk north",
-            Direction::East => "walk east",
-            Direction::South => "walk south",
-            Direction::West => "walk west",
-        }
-    }
 }
 
 struct Player {}
@@ -47,7 +38,28 @@ struct Pos {
 struct Bombs(Vec<Pos>);
 
 #[derive(Debug)]
-struct PlayerDirection(Direction);
+struct PlayerDirection {
+    direction: Direction,
+    walking: bool,
+}
+
+impl PlayerDirection {
+    fn animation(&self) -> String {
+        let dir = match self.direction {
+            Direction::North => "north",
+            Direction::East => "east",
+            Direction::South => "south",
+            Direction::West => "west",
+        };
+        let ani = match self.walking {
+            true => "walk",
+            false => "stand",
+        };
+        format!("{} {}", ani, dir)
+    }
+}
+
+struct PlaceBombEvent(Pos);
 
 fn setup(
     commands: &mut Commands,
@@ -71,8 +83,14 @@ fn setup(
     // let music = asset_server.load("data/SOUND/MENU.RSS");
     // audio.play(music);
 
-    let direction = Direction::North;
-    let animation = named_assets.animations.get(direction.animation()).unwrap();
+    let player_direction = PlayerDirection {
+        direction: Direction::North,
+        walking: false,
+    };
+    let animation = named_assets
+        .animations
+        .get(&player_direction.animation())
+        .unwrap();
 
     commands
         .spawn((
@@ -80,9 +98,10 @@ fn setup(
             GlobalTransform::default(),
         ))
         .with(Player {})
-        .with(PlayerDirection(direction))
+        .with(player_direction)
         .with(Pos { x: 0, y: 0 })
         .with(Bombs(vec![]))
+        .with(Timer::from_seconds(1. / 60., true))
         .with_children(|parent| {
             AnimatedSprite::spawn_child(parent, animation.clone(), &animation_assets);
         });
@@ -100,7 +119,8 @@ fn setup(
             let tx = 20.0 + x as f32 * 40.0;
             let ty = -64.0 - y as f32 * 36.0;
 
-            let animation = match scheme.grid[y][x] {
+            let cell = scheme.grid[y][x];
+            let animation = match cell {
                 Cell::Solid => solid,
                 Cell::Brick => brick,
                 Cell::Blank => blank,
@@ -111,6 +131,11 @@ fn setup(
                     Transform::from_translation(Vec3::new(tx + 20.0, ty - 18.0, 0.0)),
                     GlobalTransform::default(),
                 ))
+                .with(cell)
+                .with(Pos {
+                    x: x as u8,
+                    y: y as u8,
+                })
                 .with_children(|parent| {
                     AnimatedSprite::spawn_child(parent, animation.clone(), &animation_assets);
                 });
@@ -118,43 +143,75 @@ fn setup(
     }
 }
 
-fn update_pos_from_transform(transform: &Transform, pos: &mut Pos) {
-    // player is 110x110
-    pos.x = ((transform.translation.x - 20.) / 40.) as u8;
-    pos.y = ((transform.translation.y - 32.0 - -64.0) / -36.) as u8;
+fn key_to_direction(key_code: &KeyCode) -> Option<Direction> {
+    match key_code {
+        KeyCode::A => Some(Direction::West),
+        KeyCode::D => Some(Direction::East),
+        KeyCode::S => Some(Direction::South),
+        KeyCode::W => Some(Direction::North),
+        _ => None,
+    }
+}
+
+fn keyboard_handling(
+    mut keyboard_events: EventReader<KeyboardInput>,
+    mut query: Query<(&mut PlayerDirection, &Pos)>,
+    mut place_bomb_events: ResMut<Events<PlaceBombEvent>>,
+) {
+    // TODO: need to remember which keys are pressed.
+    // maybe the naive input handling is enough?
+    for (mut player_direction, pos) in query.iter_mut() {
+        for event in keyboard_events.iter() {
+            if let Some(key_code) = event.key_code {
+                if let Some(new_direction) = key_to_direction(&key_code) {
+                    if event.state.is_pressed() {
+                        if player_direction.direction != new_direction {
+                            player_direction.direction = new_direction;
+                        }
+                        if !player_direction.walking {
+                            player_direction.walking = true;
+                        }
+                    } else if player_direction.direction == new_direction {
+                        player_direction.walking = false;
+                    }
+                } else if event.state.is_pressed() && key_code == KeyCode::Space {
+                    place_bomb_events.send(PlaceBombEvent(pos.clone()));
+                }
+            }
+        }
+    }
 }
 
 fn player_movement(
-    keyboard_input: Res<Input<KeyCode>>,
-    mut query: Query<(&mut Transform, &mut PlayerDirection, &mut Pos)>,
+    time: Res<Time>,
+    mut query: Query<(&mut Timer, &mut Transform, &mut Pos, &PlayerDirection)>,
+    grid: Query<(&Cell, &Pos)>,
 ) {
-    for (mut transform, mut direction, mut pos) in query.iter_mut() {
-        if keyboard_input.pressed(KeyCode::A) {
-            transform.translation.x -= 2.;
-            update_pos_from_transform(&transform, &mut pos);
-            if direction.0 != Direction::West {
-                direction.0 = Direction::West;
-            }
-        }
-        if keyboard_input.pressed(KeyCode::D) {
-            transform.translation.x += 2.;
-            update_pos_from_transform(&transform, &mut pos);
-            if direction.0 != Direction::East {
-                direction.0 = Direction::East;
-            }
-        }
-        if keyboard_input.pressed(KeyCode::S) {
-            transform.translation.y -= 2.;
-            update_pos_from_transform(&transform, &mut pos);
-            if direction.0 != Direction::South {
-                direction.0 = Direction::South;
-            }
-        }
-        if keyboard_input.pressed(KeyCode::W) {
-            transform.translation.y += 2.;
-            update_pos_from_transform(&transform, &mut pos);
-            if direction.0 != Direction::North {
-                direction.0 = Direction::North;
+    for (mut timer, mut transform, mut pos, player_direction) in query.iter_mut() {
+        timer.tick(time.delta_seconds());
+        if timer.finished() && player_direction.walking {
+            let mut new_translation = transform.translation;
+            match player_direction.direction {
+                Direction::West => new_translation.x -= 2.,
+                Direction::East => new_translation.x += 2.,
+                Direction::South => new_translation.y -= 2.,
+                Direction::North => new_translation.y += 2.,
+            };
+
+            let new_pos = Pos {
+                x: ((new_translation.x - 20.) / 40.) as u8,
+                y: ((new_translation.y - 32.0 - -64.0) / -36.) as u8,
+            };
+
+            let collision = grid
+                .iter()
+                .any(|(cell, pos)| cell != &Cell::Blank && pos == &new_pos);
+
+            if !collision {
+                transform.translation.x = new_translation.x;
+                transform.translation.y = new_translation.y;
+                pos.x = new_pos.x;
+                pos.y = new_pos.y;
             }
         }
     }
@@ -199,16 +256,14 @@ fn change_sprite(
     animation_assets: Res<Assets<Animation>>,
     mut query: Query<(Entity, &Children, &PlayerDirection), Changed<PlayerDirection>>,
 ) {
-    for (entity, children, direction) in query.iter_mut() {
-        println!("direction changed to: {:?}", direction.0);
-
+    for (entity, children, player_direction) in query.iter_mut() {
         if let Some(child) = children.first().copied() {
             commands.despawn_recursive(child);
         }
 
         let animation = named_assets
             .animations
-            .get(direction.0.animation())
+            .get(&player_direction.animation())
             .unwrap();
 
         let child = AnimatedSprite::spawn(commands, animation.clone(), &animation_assets)

@@ -1,4 +1,4 @@
-use crate::asset_loaders::Animation;
+use super::Animation;
 use bevy::prelude::*;
 
 #[derive(Default)]

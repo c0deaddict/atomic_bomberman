@@ -1,16 +1,14 @@
-mod animation;
 mod color_palette;
 mod pcx_image;
 mod raw_sound;
 mod scheme;
 
-use animation::AnimationAssetLoader;
+use crate::animation::{AnimationAssetLoader, Animation, AnimationBundle};
 use color_palette::ColorPaletteAssetLoader;
 use pcx_image::PcxImageAssetLoader;
 use raw_sound::RawSoundAssetLoader;
 use scheme::SchemeAssetLoader;
 
-pub use animation::{Animation, AnimationBundle, Frame};
 pub use scheme::{Cell, Grid, Powerup, PowerupInfo, Scheme};
 
 use bevy::prelude::*;

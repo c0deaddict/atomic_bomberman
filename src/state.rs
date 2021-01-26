@@ -1,4 +1,5 @@
-use crate::asset_loaders::{Animation, Scheme};
+use crate::animation::Animation;
+use crate::asset_loaders::Scheme;
 use bevy::prelude::*;
 use std::collections::HashMap;
 
