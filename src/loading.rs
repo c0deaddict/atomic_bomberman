@@ -47,7 +47,7 @@ const ANIMATION_LIST: &'static [&str] = &[
     // "KFACE.ANI",
     // "KFONT.ANI",
     // "KICK.ANI",
-    // "MFLAME.ANI",
+    "MFLAME.ANI",
     // "MISC.ANI",
     // "POWERS.ANI",
     // "PUNBOMB1.ANI",

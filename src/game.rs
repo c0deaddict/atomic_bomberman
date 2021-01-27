@@ -1,6 +1,7 @@
 use crate::{animation::*, asset_loaders::*, state::*};
 use bevy::{input::keyboard::KeyboardInput, prelude::*};
 use std::cmp::{Eq, PartialEq};
+use std::collections::HashMap;
 use std::fmt::Debug;
 
 #[derive(Default)]
@@ -14,6 +15,8 @@ impl Plugin for GamePlugin {
             .on_state_update(STAGE, AppState::Game, keyboard_handling.system())
             .on_state_update(STAGE, AppState::Game, player_movement.system())
             .on_state_update(STAGE, AppState::Game, place_bomb.system())
+            .on_state_update(STAGE, AppState::Game, trigger_bomb.system())
+            .on_state_update(STAGE, AppState::Game, flame_out.system())
             .on_state_update(STAGE, AppState::Game, change_sprite.system())
             .on_state_exit(STAGE, AppState::Game, cleanup.system());
     }
@@ -27,15 +30,16 @@ enum Direction {
     West,
 }
 
-struct Player {}
+struct Player;
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
 struct Pos {
-    x: u8,
-    y: u8,
+    x: i8,
+    y: i8,
 }
 
-struct Bombs(Vec<Pos>);
+struct Bomb;
+struct Flame;
 
 #[derive(Debug)]
 struct PlayerDirection {
@@ -63,6 +67,10 @@ impl PlayerDirection {
 }
 
 struct PlaceBombEvent(Pos);
+
+fn pos_to_vec(pos: &Pos) -> Vec3 {
+    Vec3::new(20.0 + pos.x as f32 * 40.0, -64.0 - pos.y as f32 * 36.0, 0.0)
+}
 
 fn setup(
     commands: &mut Commands,
@@ -100,11 +108,10 @@ fn setup(
             Transform::from_translation(Vec3::new(320., -240., 1.0)),
             GlobalTransform::default(),
         ))
-        .with(Player {})
+        .with(Player)
         .with(player_direction)
         .with(KeyboardMovement::default())
         .with(Pos { x: 0, y: 0 })
-        .with(Bombs(vec![]))
         .with(Timer::from_seconds(1. / 60., true))
         .with_children(|parent| {
             let shadow = named_assets.animations.get("shadow").unwrap();
@@ -130,9 +137,6 @@ fn setup(
 
     for x in 0..15 {
         for y in 0..11 {
-            let tx = 20.0 + x as f32 * 40.0;
-            let ty = -64.0 - y as f32 * 36.0;
-
             let cell = scheme.grid[y][x];
             let animation = match cell {
                 Cell::Solid => solid,
@@ -140,16 +144,18 @@ fn setup(
                 Cell::Blank => blank,
             };
 
+            let pos = Pos {
+                x: x as i8,
+                y: y as i8,
+            };
+
             commands
                 .spawn((
-                    Transform::from_translation(Vec3::new(tx + 20.0, ty - 18.0, 0.0)),
+                    Transform::from_translation(pos_to_vec(&pos) + Vec3::new(20.0, -18.0, 0.0)),
                     GlobalTransform::default(),
                 ))
                 .with(cell)
-                .with(Pos {
-                    x: x as u8,
-                    y: y as u8,
-                })
+                .with(pos)
                 .with_children(|parent| {
                     AnimatedSprite::spawn_child(parent, animation.clone(), &animation_assets);
                 });
@@ -219,8 +225,8 @@ fn player_movement(
             };
 
             let new_pos = Pos {
-                x: ((new_translation.x - 20.) / 40.) as u8,
-                y: ((new_translation.y - 32.0 - -64.0) / -36.) as u8,
+                x: ((new_translation.x - 20.) / 40.) as i8,
+                y: ((new_translation.y - 32.0 - -64.0) / -36.) as i8,
             };
 
             let collision = grid
@@ -241,30 +247,220 @@ fn place_bomb(
     commands: &mut Commands,
     named_assets: Res<NamedAssets>,
     animation_assets: Res<Assets<Animation>>,
-    keyboard_input: Res<Input<KeyCode>>,
-    mut query: Query<(&Pos, &mut Bombs)>,
+    mut place_bomb_events: EventReader<PlaceBombEvent>,
+    query: Query<&Pos, With<Bomb>>,
     audio: Res<Audio>,
 ) {
-    for (pos, mut bombs) in query.iter_mut() {
-        if keyboard_input.pressed(KeyCode::Space) {
-            if !bombs.0.contains(&pos) {
-                let animation = named_assets.animations.get("bomb regular green").unwrap();
-                let x = 20.0 + pos.x as f32 * 40.0;
-                let y = -64.0 + pos.y as f32 * -36.0;
-                commands
+    for event in place_bomb_events.iter() {
+        if !query.iter().any(|&p| p == event.0) {
+            let animation = named_assets.animations.get("bomb regular green").unwrap();
+            commands
+                .spawn((
+                    Transform::from_translation(pos_to_vec(&event.0) + Vec3::new(24., -20., 0.)),
+                    GlobalTransform::default(),
+                ))
+                .with(Bomb)
+                .with(event.0)
+                .with(Timer::from_seconds(3.0, false))
+                .with_children(|parent| {
+                    AnimatedSprite::spawn_child(parent, animation.clone(), &animation_assets);
+                });
+
+            let handle = named_assets.sounds.get("bmdrop2").unwrap();
+            audio.play(handle.clone());
+        }
+    }
+}
+
+fn trigger_bomb(
+    commands: &mut Commands,
+    named_assets: Res<NamedAssets>,
+    animation_assets: Res<Assets<Animation>>,
+    time: Res<Time>,
+    mut query: Query<(Entity, &Pos, &mut Timer), With<Bomb>>,
+    grid: Query<(&Pos, Entity, &Cell)>,
+    audio: Res<Audio>,
+) {
+    let grid: HashMap<&Pos, (Entity, &Cell)> = grid
+        .iter()
+        .map(|(pos, entity, cell)| (pos, (entity, cell)))
+        .collect();
+
+    for (entity, pos, mut timer) in query.iter_mut() {
+        timer.tick(time.delta_seconds());
+        if timer.finished() {
+            commands.despawn_recursive(entity);
+
+            let handle = named_assets.sounds.get("explode2").unwrap();
+            audio.play(handle.clone());
+
+            let center = named_assets.animations.get("flame center green").unwrap();
+            let midwest = named_assets.animations.get("flame midwest green").unwrap();
+            let tipwest = named_assets.animations.get("flame tipwest green").unwrap();
+            let mideast = named_assets.animations.get("flame mideast green").unwrap();
+            let tipeast = named_assets.animations.get("flame tipeast green").unwrap();
+            let midnorth = named_assets.animations.get("flame midnorth green").unwrap();
+            let tipnorth = named_assets.animations.get("flame tipnorth green").unwrap();
+            let midsouth = named_assets.animations.get("flame midsouth green").unwrap();
+            let tipsouth = named_assets.animations.get("flame tipsouth green").unwrap();
+
+            let flame = commands
+                .spawn((
+                    Transform::from_translation(pos_to_vec(&pos) + Vec3::new(21., -19., 0.)),
+                    GlobalTransform::default(),
+                ))
+                .with(Flame)
+                .with(Timer::from_seconds(0.5, false))
+                .with_children(|parent| {
+                    AnimatedSprite::spawn_child(parent, center.clone(), &animation_assets);
+                })
+                .current_entity()
+                .unwrap();
+
+            let strength = 3;
+
+            // TODO: sync animation of entire flame.
+            // TODO: first plot path of flame, then turn into animations
+            // TODO: brick becomes blank.
+            // TODO: trigger other bombs in path
+            // TODO: kill in path
+
+            for x in ((pos.x - (strength - 1))..pos.x).rev() {
+                if x < 0 {
+                    break;
+                }
+
+                let p = Pos { x, y: pos.y };
+                match grid.get(&p) {
+                    Some((entity, Cell::Solid)) => {
+                        break;
+                    }
+                    Some((entity, Cell::Brick)) => {
+                        commands.despawn_recursive(*entity);
+                        break;
+                    }
+                    _ => {}
+                }
+
+                let part = commands
                     .spawn((
-                        Transform::from_translation(Vec3::new(x + 24., y - 20., 0.0)),
+                        Transform::from_translation(Vec3::new((x - pos.x) as f32 * 40., -6., 0.)),
                         GlobalTransform::default(),
                     ))
                     .with_children(|parent| {
-                        AnimatedSprite::spawn_child(parent, animation.clone(), &animation_assets);
-                    });
+                        AnimatedSprite::spawn_child(parent, midwest.clone(), &animation_assets);
+                    })
+                    .current_entity()
+                    .unwrap();
 
-                let handle = named_assets.sounds.get("bmdrop2").unwrap();
-                audio.play(handle.clone());
-
-                bombs.0.push(pos.clone());
+                commands.push_children(flame, &[part]);
             }
+
+            for x in (pos.x + 1)..(pos.x + strength) {
+                if x >= 15 {
+                    break;
+                }
+
+                let p = Pos { x, y: pos.y };
+                match grid.get(&p) {
+                    Some((entity, Cell::Solid)) => {
+                        break;
+                    }
+                    Some((entity, Cell::Brick)) => {
+                        commands.despawn_recursive(*entity);
+                        break;
+                    }
+                    _ => {}
+                }
+
+                let part = commands
+                    .spawn((
+                        Transform::from_translation(Vec3::new((x - pos.x) as f32 * 40.0, -4., 0.)),
+                        GlobalTransform::default(),
+                    ))
+                    .with_children(|parent| {
+                        AnimatedSprite::spawn_child(parent, mideast.clone(), &animation_assets);
+                    })
+                    .current_entity()
+                    .unwrap();
+
+                commands.push_children(flame, &[part]);
+            }
+
+            for y in ((pos.y - (strength - 1))..pos.y).rev() {
+                if y < 0 {
+                    break;
+                }
+
+                let p = Pos { x: pos.x, y };
+                match grid.get(&p) {
+                    Some((entity, Cell::Solid)) => {
+                        break;
+                    }
+                    Some((entity, Cell::Brick)) => {
+                        commands.despawn_recursive(*entity);
+                        break;
+                    }
+                    _ => {}
+                }
+
+                let part = commands
+                    .spawn((
+                        Transform::from_translation(Vec3::new(6., (y - pos.y) as f32 * 32., 0.)),
+                        GlobalTransform::default(),
+                    ))
+                    .with_children(|parent| {
+                        AnimatedSprite::spawn_child(parent, midnorth.clone(), &animation_assets);
+                    })
+                    .current_entity()
+                    .unwrap();
+
+                commands.push_children(flame, &[part]);
+            }
+
+            for y in (pos.y + 1)..(pos.y + strength) {
+                if y >= 11 {
+                    break;
+                }
+
+                let p = Pos { x: pos.x, y };
+                match grid.get(&p) {
+                    Some((entity, Cell::Solid)) => {
+                        break;
+                    }
+                    Some((entity, Cell::Brick)) => {
+                        commands.despawn_recursive(*entity);
+                        break;
+                    }
+                    _ => {}
+                }
+
+                let part = commands
+                    .spawn((
+                        Transform::from_translation(Vec3::new(6., (y - pos.y) as f32 * 32.0, 0.)),
+                        GlobalTransform::default(),
+                    ))
+                    .with_children(|parent| {
+                        AnimatedSprite::spawn_child(parent, midsouth.clone(), &animation_assets);
+                    })
+                    .current_entity()
+                    .unwrap();
+
+                commands.push_children(flame, &[part]);
+            }
+        }
+    }
+}
+
+fn flame_out(
+    commands: &mut Commands,
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut Timer), With<Flame>>,
+) {
+    for (entity, mut timer) in query.iter_mut() {
+        timer.tick(time.delta_seconds());
+        if timer.finished() {
+            commands.despawn_recursive(entity);
         }
     }
 }
