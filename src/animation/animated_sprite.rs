@@ -18,8 +18,10 @@ pub struct AnimatedSprite {
     // TODO: fire event when done?
 }
 
+// TODO: option to attach multiple spritesheetbundles
 // TODO: hack because bundle can't be extended.
 // Track: https://github.com/bevyengine/bevy/discussions/1217
+// TODO: need to be able to override Transform
 impl AnimatedSprite {
     pub fn spawn<'a>(
         commands: &'a mut Commands,
