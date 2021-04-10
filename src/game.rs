@@ -1,7 +1,7 @@
 use crate::{animation::*, asset_loaders::*, state::*};
 use bevy::{input::keyboard::KeyboardInput, prelude::*};
 use std::cmp::{Eq, PartialEq};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 
 #[derive(Default)]
@@ -216,10 +216,18 @@ fn keyboard_handling(
 
 fn player_movement(
     time: Res<Time>,
-    mut query: Query<(&mut Timer, &mut Transform, &mut Pos, &PlayerDirection)>,
-    grid: Query<(&Cell, &Pos)>,
+    mut queries: QuerySet<(
+        Query<(&mut Timer, &mut Transform, &mut Pos, &PlayerDirection)>,
+        Query<(&Cell, &Pos)>
+    )>,
 ) {
-    for (mut timer, mut transform, mut pos, player_direction) in query.iter_mut() {
+    let occupied: HashSet<Pos> = queries.q1()
+        .iter()
+        .filter(|(cell, _pos)| cell != &&Cell::Blank)
+        .map(|(_cell, pos)| pos.clone())
+        .collect();
+
+    for (mut timer, mut transform, mut pos, player_direction) in queries.q0_mut().iter_mut() {
         timer.tick(time.delta());
         if timer.finished() && player_direction.walking {
             let mut new_translation = transform.translation;
@@ -235,9 +243,7 @@ fn player_movement(
                 y: ((new_translation.y - 32.0 - -64.0) / -36.) as i8,
             };
 
-            let collision = grid
-                .iter()
-                .any(|(cell, pos)| cell != &Cell::Blank && pos == &new_pos);
+            let collision = occupied.contains(&new_pos);
 
             if !collision {
                 transform.translation.x = new_translation.x;
