@@ -1,5 +1,6 @@
 use super::Animation;
 use bevy::prelude::*;
+use bevy::ecs::bundle::Bundle;
 
 #[derive(Default)]
 pub struct AnimatedSpritePlugin;
@@ -10,7 +11,12 @@ impl Plugin for AnimatedSpritePlugin {
     }
 }
 
+#[derive(Bundle)]
 pub struct AnimatedSprite {
+    #[bundle]
+    pub sprite_sheet: SpriteSheetBundle,
+
+    pub timer: Timer,
     pub animation: Handle<Animation>,
     pub index: usize,
     // TODO: playing: bool
@@ -19,48 +25,20 @@ pub struct AnimatedSprite {
 }
 
 // TODO: option to attach multiple spritesheetbundles
-// TODO: hack because bundle can't be extended.
-// Track: https://github.com/bevyengine/bevy/discussions/1217
-// TODO: need to be able to override Transform
 impl AnimatedSprite {
-    pub fn spawn<'a>(
-        commands: &'a mut Commands,
-        animation: Handle<Animation>,
-        animation_assets: &Assets<Animation>,
-    ) -> &'a Commands {
+    pub fn new(animation: Handle<Animation>, animation_assets: &Assets<Animation>) -> AnimatedSprite {
         let asset = animation_assets.get(&animation).unwrap();
-        commands
-            .spawn(SpriteSheetBundle {
+        AnimatedSprite {
+            sprite_sheet: SpriteSheetBundle {
                 texture_atlas: asset.atlas.texture.clone(),
                 sprite: TextureAtlasSprite::new(asset.frames[0].index as u32),
                 ..Default::default()
-            })
-            .with(AnimatedSprite {
-                animation,
-                index: 0,
-            })
+            },
             // TODO: only add timer if animation.frames().len > 1
-            .with(Timer::from_seconds(1. / 25., true))
-    }
-
-    pub fn spawn_child<'a>(
-        commands: &'a mut ChildBuilder,
-        animation: Handle<Animation>,
-        animation_assets: &Assets<Animation>,
-    ) -> &'a ChildBuilder<'a> {
-        let asset = animation_assets.get(&animation).unwrap();
-        commands
-            .spawn(SpriteSheetBundle {
-                texture_atlas: asset.atlas.texture.clone(),
-                sprite: TextureAtlasSprite::new(asset.frames[0].index as u32),
-                ..Default::default()
-            })
-            .with(AnimatedSprite {
-                animation,
-                index: 0,
-            })
-            // TODO: only add timer if animation.frames().len > 1
-            .with(Timer::from_seconds(1. / 25., true))
+            timer: Timer::from_seconds(1. / 25., true),
+            animation,
+            index: 0,
+        }
     }
 }
 
@@ -71,7 +49,7 @@ fn animate_sprite(
 ) {
     for (mut timer, mut sprite, mut animate_sprite) in query.iter_mut() {
         let animation = animation_assets.get(&animate_sprite.animation).unwrap();
-        timer.tick(time.delta_seconds());
+        timer.tick(time.delta());
         if timer.finished() {
             animate_sprite.index = (animate_sprite.index + 1) % animation.frames.len();
             sprite.index = animation.frames[animate_sprite.index].index as u32;

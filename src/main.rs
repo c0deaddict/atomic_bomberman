@@ -11,13 +11,12 @@ use bevy::{
 
 fn main() {
     App::build()
-        .add_resource(State::new(AppState::Loading))
-        .add_resource(bevy::log::LogSettings {
+        .add_state(AppState::Loading)
+        .insert_resource(bevy::log::LogSettings {
             level: bevy::log::Level::INFO,
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
-        .add_stage_after(stage::UPDATE, STAGE, StateStage::<AppState>::default())
         .add_plugin(WindowPlugin)
         .add_plugin(FrameTimeDiagnosticsPlugin)
         .add_plugin(LoadingPlugin)
@@ -30,25 +29,25 @@ fn main() {
 
 struct FpsText;
 
-fn setup(commands: &mut Commands, asset_server: Res<AssetServer>) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
-        .spawn(Text2dBundle {
-            text: Text {
-                value: "FPS".to_string(),
-                font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                style: TextStyle {
+        .spawn_bundle(TextBundle {
+            text: Text::with_section(
+                "FPS".to_string(),
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
                     font_size: 20.0,
                     color: Color::WHITE,
-                    alignment: TextAlignment {
-                        vertical: VerticalAlign::Bottom,
-                        horizontal: HorizontalAlign::Right,
-                    },
                 },
-            },
+                TextAlignment {
+                    vertical: VerticalAlign::Bottom,
+                    horizontal: HorizontalAlign::Right,
+                },
+            ),
             transform: Transform::from_translation(Vec3::new(2., -2., 3.)),
             ..Default::default()
         })
-        .with(FpsText);
+        .insert(FpsText);
 }
 
 // https://github.com/bevyengine/bevy/pull/273
@@ -61,7 +60,8 @@ fn fps_counter_system(
     if let Some(fps) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
         if let Some(average) = fps.average() {
             for mut text in query.iter_mut() {
-                text.value = format!("FPS: {:.2} #ent {}", average, entities.iter().count());
+                text.sections[0].value =
+                    format!("FPS: {:.2} #ent {}", average, entities.iter().count());
             }
         }
     };

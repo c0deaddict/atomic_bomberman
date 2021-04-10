@@ -11,14 +11,17 @@ impl Plugin for GamePlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_plugin(AnimatedSpritePlugin)
             .add_event::<PlaceBombEvent>()
-            .on_state_enter(STAGE, AppState::Game, setup.system())
-            .on_state_update(STAGE, AppState::Game, keyboard_handling.system())
-            .on_state_update(STAGE, AppState::Game, player_movement.system())
-            .on_state_update(STAGE, AppState::Game, place_bomb.system())
-            .on_state_update(STAGE, AppState::Game, trigger_bomb.system())
-            .on_state_update(STAGE, AppState::Game, flame_out.system())
-            .on_state_update(STAGE, AppState::Game, change_sprite.system())
-            .on_state_exit(STAGE, AppState::Game, cleanup.system());
+            .add_system_set(SystemSet::on_enter(AppState::Game).with_system(setup.system()))
+            .add_system_set(
+                SystemSet::on_update(AppState::Game)
+                    .with_system(keyboard_handling.system())
+                    .with_system(player_movement.system())
+                    .with_system(place_bomb.system())
+                    .with_system(trigger_bomb.system())
+                    .with_system(flame_out.system())
+                    .with_system(change_sprite.system()),
+            )
+            .add_system_set(SystemSet::on_exit(AppState::Game).with_system(cleanup.system()));
     }
 }
 
@@ -73,7 +76,7 @@ fn pos_to_vec(pos: &Pos) -> Vec3 {
 }
 
 fn setup(
-    commands: &mut Commands,
+    mut commands: Commands,
     asset_server: Res<AssetServer>,
     // audio: Res<Audio>,
     named_assets: Res<NamedAssets>,
@@ -85,7 +88,7 @@ fn setup(
     //   WALK.ANI for walking
 
     let background_handle = asset_server.load("data/RES/FIELD0.PCX");
-    commands.spawn(SpriteBundle {
+    commands.spawn_bundle(SpriteBundle {
         material: materials.add(background_handle.into()),
         transform: Transform::from_translation(Vec3::new(320., -240., 0.)),
         ..Default::default()
@@ -104,27 +107,30 @@ fn setup(
         .unwrap();
 
     commands
-        .spawn((
+        .spawn_bundle((
             Transform::from_translation(Vec3::new(320., -240., 1.0)),
             GlobalTransform::default(),
         ))
-        .with(Player)
-        .with(player_direction)
-        .with(KeyboardMovement::default())
-        .with(Pos { x: 0, y: 0 })
-        .with(Timer::from_seconds(1. / 60., true))
+        .insert(Player)
+        .insert(player_direction)
+        .insert(KeyboardMovement::default())
+        .insert(Pos { x: 0, y: 0 })
+        .insert(Timer::from_seconds(1. / 60., true))
         .with_children(|parent| {
             let shadow = named_assets.animations.get("shadow").unwrap();
-            // TODO: make a bundle or something for this. this is ugly.
+
             parent
-                .spawn((
+                .spawn_bundle((
                     Transform::from_translation(Vec3::new(0.0, -35.0, 0.0)),
                     GlobalTransform::default(),
                 ))
-                .with_children(|parent| {
-                    AnimatedSprite::spawn_child(parent, shadow.clone(), &animation_assets);
-                });
-            AnimatedSprite::spawn_child(parent, animation.clone(), &animation_assets);
+                .insert_bundle(
+                    AnimatedSprite::new(shadow.clone(), &animation_assets)
+                );
+
+            parent.spawn_bundle(
+                AnimatedSprite::new(animation.clone(), &animation_assets)
+            );
         });
 
     let scheme = scheme_assets
@@ -150,14 +156,14 @@ fn setup(
             };
 
             commands
-                .spawn((
+                .spawn_bundle((
                     Transform::from_translation(pos_to_vec(&pos) + Vec3::new(20.0, -18.0, 0.0)),
                     GlobalTransform::default(),
                 ))
-                .with(cell)
-                .with(pos)
+                .insert(cell)
+                .insert(pos)
                 .with_children(|parent| {
-                    AnimatedSprite::spawn_child(parent, animation.clone(), &animation_assets);
+                    parent.spawn_bundle(AnimatedSprite::new(animation.clone(), &animation_assets));
                 });
         }
     }
@@ -176,7 +182,7 @@ fn key_to_direction(key_code: &KeyCode) -> Option<Direction> {
 fn keyboard_handling(
     mut keyboard_events: EventReader<KeyboardInput>,
     mut query: Query<(&mut PlayerDirection, &mut KeyboardMovement, &Pos)>,
-    mut place_bomb_events: ResMut<Events<PlaceBombEvent>>,
+    mut place_bomb_events: EventWriter<PlaceBombEvent>,
 ) {
     // TODO: need to remember which keys are pressed.
     // maybe the naive input handling is enough?
@@ -214,7 +220,7 @@ fn player_movement(
     grid: Query<(&Cell, &Pos)>,
 ) {
     for (mut timer, mut transform, mut pos, player_direction) in query.iter_mut() {
-        timer.tick(time.delta_seconds());
+        timer.tick(time.delta());
         if timer.finished() && player_direction.walking {
             let mut new_translation = transform.translation;
             match player_direction.direction {
@@ -244,7 +250,7 @@ fn player_movement(
 }
 
 fn place_bomb(
-    commands: &mut Commands,
+    mut commands: Commands,
     named_assets: Res<NamedAssets>,
     animation_assets: Res<Assets<Animation>>,
     mut place_bomb_events: EventReader<PlaceBombEvent>,
@@ -255,15 +261,15 @@ fn place_bomb(
         if !query.iter().any(|&p| p == event.0) {
             let animation = named_assets.animations.get("bomb regular green").unwrap();
             commands
-                .spawn((
+                .spawn_bundle((
                     Transform::from_translation(pos_to_vec(&event.0) + Vec3::new(24., -20., 0.)),
                     GlobalTransform::default(),
                 ))
-                .with(Bomb)
-                .with(event.0)
-                .with(Timer::from_seconds(3.0, false))
+                .insert(Bomb)
+                .insert(event.0)
+                .insert(Timer::from_seconds(3.0, false))
                 .with_children(|parent| {
-                    AnimatedSprite::spawn_child(parent, animation.clone(), &animation_assets);
+                    parent.spawn_bundle(AnimatedSprite::new(animation.clone(), &animation_assets));
                 });
 
             let handle = named_assets.sounds.get("bmdrop2").unwrap();
@@ -273,7 +279,7 @@ fn place_bomb(
 }
 
 fn trigger_bomb(
-    commands: &mut Commands,
+    mut commands: Commands,
     named_assets: Res<NamedAssets>,
     animation_assets: Res<Assets<Animation>>,
     time: Res<Time>,
@@ -287,9 +293,9 @@ fn trigger_bomb(
         .collect();
 
     for (entity, pos, mut timer) in query.iter_mut() {
-        timer.tick(time.delta_seconds());
+        timer.tick(time.delta());
         if timer.finished() {
-            commands.despawn_recursive(entity);
+            commands.entity(entity).despawn_recursive();
 
             let handle = named_assets.sounds.get("explode2").unwrap();
             audio.play(handle.clone());
@@ -305,17 +311,16 @@ fn trigger_bomb(
             let tipsouth = named_assets.animations.get("flame tipsouth green").unwrap();
 
             let flame = commands
-                .spawn((
+                .spawn_bundle((
                     Transform::from_translation(pos_to_vec(&pos) + Vec3::new(21., -19., 0.)),
                     GlobalTransform::default(),
                 ))
-                .with(Flame)
-                .with(Timer::from_seconds(0.5, false))
+                .insert(Flame)
+                .insert(Timer::from_seconds(0.5, false))
                 .with_children(|parent| {
-                    AnimatedSprite::spawn_child(parent, center.clone(), &animation_assets);
+                    parent.spawn_bundle(AnimatedSprite::new(center.clone(), &animation_assets));
                 })
-                .current_entity()
-                .unwrap();
+                .id();
 
             let strength = 3;
 
@@ -336,24 +341,23 @@ fn trigger_bomb(
                         break;
                     }
                     Some((entity, Cell::Brick)) => {
-                        commands.despawn_recursive(*entity);
+                        commands.entity(*entity).despawn_recursive();
                         break;
                     }
                     _ => {}
                 }
 
                 let part = commands
-                    .spawn((
+                    .spawn_bundle((
                         Transform::from_translation(Vec3::new((x - pos.x) as f32 * 40., -6., 0.)),
                         GlobalTransform::default(),
                     ))
                     .with_children(|parent| {
-                        AnimatedSprite::spawn_child(parent, midwest.clone(), &animation_assets);
+                        parent.spawn_bundle(AnimatedSprite::new(midwest.clone(), &animation_assets));
                     })
-                    .current_entity()
-                    .unwrap();
+                    .id();
 
-                commands.push_children(flame, &[part]);
+                commands.entity(flame).push_children(&[part]);
             }
 
             for x in (pos.x + 1)..(pos.x + strength) {
@@ -367,24 +371,23 @@ fn trigger_bomb(
                         break;
                     }
                     Some((entity, Cell::Brick)) => {
-                        commands.despawn_recursive(*entity);
+                        commands.entity(*entity).despawn_recursive();
                         break;
                     }
                     _ => {}
                 }
 
                 let part = commands
-                    .spawn((
+                    .spawn_bundle((
                         Transform::from_translation(Vec3::new((x - pos.x) as f32 * 40.0, -4., 0.)),
                         GlobalTransform::default(),
                     ))
                     .with_children(|parent| {
-                        AnimatedSprite::spawn_child(parent, mideast.clone(), &animation_assets);
+                        parent.spawn_bundle(AnimatedSprite::new(mideast.clone(), &animation_assets));
                     })
-                    .current_entity()
-                    .unwrap();
+                    .id();
 
-                commands.push_children(flame, &[part]);
+                commands.entity(flame).push_children(&[part]);
             }
 
             for y in ((pos.y - (strength - 1))..pos.y).rev() {
@@ -398,24 +401,23 @@ fn trigger_bomb(
                         break;
                     }
                     Some((entity, Cell::Brick)) => {
-                        commands.despawn_recursive(*entity);
+                        commands.entity(*entity).despawn_recursive();
                         break;
                     }
                     _ => {}
                 }
 
                 let part = commands
-                    .spawn((
+                    .spawn_bundle((
                         Transform::from_translation(Vec3::new(6., (y - pos.y) as f32 * 32., 0.)),
                         GlobalTransform::default(),
                     ))
                     .with_children(|parent| {
-                        AnimatedSprite::spawn_child(parent, midnorth.clone(), &animation_assets);
+                        parent.spawn_bundle(AnimatedSprite::new(midnorth.clone(), &animation_assets));
                     })
-                    .current_entity()
-                    .unwrap();
+                    .id();
 
-                commands.push_children(flame, &[part]);
+                commands.entity(flame).push_children(&[part]);
             }
 
             for y in (pos.y + 1)..(pos.y + strength) {
@@ -429,52 +431,51 @@ fn trigger_bomb(
                         break;
                     }
                     Some((entity, Cell::Brick)) => {
-                        commands.despawn_recursive(*entity);
+                        commands.entity(*entity).despawn_recursive();
                         break;
                     }
                     _ => {}
                 }
 
                 let part = commands
-                    .spawn((
+                    .spawn_bundle((
                         Transform::from_translation(Vec3::new(6., (y - pos.y) as f32 * 32.0, 0.)),
                         GlobalTransform::default(),
                     ))
                     .with_children(|parent| {
-                        AnimatedSprite::spawn_child(parent, midsouth.clone(), &animation_assets);
+                        parent.spawn_bundle(AnimatedSprite::new(midsouth.clone(), &animation_assets));
                     })
-                    .current_entity()
-                    .unwrap();
+                    .id();
 
-                commands.push_children(flame, &[part]);
+                commands.entity(flame).push_children(&[part]);
             }
         }
     }
 }
 
 fn flame_out(
-    commands: &mut Commands,
+    mut commands: Commands,
     time: Res<Time>,
     mut query: Query<(Entity, &mut Timer), With<Flame>>,
 ) {
     for (entity, mut timer) in query.iter_mut() {
-        timer.tick(time.delta_seconds());
+        timer.tick(time.delta());
         if timer.finished() {
-            commands.despawn_recursive(entity);
+            commands.entity(entity).despawn_recursive();
         }
     }
 }
 
 // NOTE: systems with Changed<> must be added AFTER the system that triggers the change.
 fn change_sprite(
-    commands: &mut Commands,
+    mut commands: Commands,
     named_assets: Res<NamedAssets>,
     animation_assets: Res<Assets<Animation>>,
     mut query: Query<(Entity, &mut Children, &PlayerDirection), Changed<PlayerDirection>>,
 ) {
     for (entity, children, player_direction) in query.iter_mut() {
         if let Some(child) = children.last().copied() {
-            commands.despawn_recursive(child);
+            commands.entity(child).despawn_recursive();
         }
 
         let animation = named_assets
@@ -482,11 +483,11 @@ fn change_sprite(
             .get(&player_direction.animation())
             .unwrap();
 
-        let child = AnimatedSprite::spawn(commands, animation.clone(), &animation_assets)
-            .current_entity()
-            .unwrap();
+        let child = commands
+            .spawn_bundle(AnimatedSprite::new(animation.clone(), &animation_assets))
+            .id();
 
-        commands.push_children(entity, &[child]);
+        commands.entity(entity).push_children(&[child]);
     }
 }
 

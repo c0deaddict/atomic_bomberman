@@ -14,12 +14,15 @@ impl Plugin for LoadingPlugin {
         app.add_plugin(CustomAssetLoaders)
             .init_resource::<AssetsLoading>()
             .init_resource::<NamedAssets>()
-            .on_state_enter(STAGE, AppState::Loading, setup.system())
-            .on_state_update(STAGE, AppState::Loading, load_animations.system())
-            .on_state_update(STAGE, AppState::Loading, load_sounds.system())
-            .on_state_update(STAGE, AppState::Loading, load_schemes.system())
-            .on_state_update(STAGE, AppState::Loading, loading_progress.system())
-            .on_state_exit(STAGE, AppState::Loading, cleanup.system());
+            .add_system_set(SystemSet::on_enter(AppState::Loading)
+                            .with_system(setup.system()))
+            .add_system_set(SystemSet::on_update(AppState::Loading)
+                            .with_system(load_animations.system())
+                            .with_system(load_sounds.system())
+                            .with_system(load_schemes.system())
+                            .with_system(loading_progress.system()))
+            .add_system_set(SystemSet::on_exit(AppState::Loading)
+                            .with_system(cleanup.system()));
     }
 }
 
@@ -274,7 +277,7 @@ struct LoadingScreen {
 }
 
 fn setup(
-    commands: &mut Commands,
+    mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut assets_loading: ResMut<AssetsLoading>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -282,36 +285,35 @@ fn setup(
     // TODO: which font is used in the original game?
     let background_handle = asset_server.load("data/RES/GLUE2.PCX");
 
-    commands
-        .spawn(SpriteBundle {
+    let entity = commands
+        .spawn_bundle(SpriteBundle {
             material: materials.add(background_handle.into()),
             transform: Transform::from_translation(Vec3::new(320., -240., 0.)),
             ..Default::default()
         })
         .with_children(|parent| {
             parent
-                .spawn(Text2dBundle {
-                    text: Text {
-                        value: "Loading...".to_string(),
-                        font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                        style: TextStyle {
+                .spawn_bundle(TextBundle {
+                    text: Text::with_section(
+                        "Loading...".to_string(),
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
                             font_size: 40.0,
                             color: Color::WHITE,
-                            alignment: TextAlignment {
+                        },
+                         TextAlignment {
                                 vertical: VerticalAlign::Center,
                                 horizontal: HorizontalAlign::Center,
-                            },
                         },
-                    },
+                    ),
                     transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
                     ..Default::default()
                 })
-                .with(LoadingText);
-        });
+                .insert(LoadingText);
+        })
+        .id();
 
-    commands.insert_resource(LoadingScreen {
-        entity: commands.current_entity().unwrap(),
-    });
+    commands.insert_resource(LoadingScreen { entity });
 
     for filename in ANIMATION_LIST {
         let path = "data/ANI/".to_owned() + filename;
@@ -405,23 +407,23 @@ fn loading_progress(
     let assets_loaded = assets_loading.initial_count - remaining_count;
 
     for mut text in query.iter_mut() {
-        text.value = format!(
+        text.sections[0].value = format!(
             "Loading {}/{} assets",
             assets_loaded, assets_loading.initial_count
         );
     }
 
     if assets_loaded == assets_loading.initial_count {
-        state.set_next(AppState::Game).unwrap();
+        state.set(AppState::Game).unwrap();
     }
 }
 
-fn cleanup(commands: &mut Commands, loading_screen: Res<LoadingScreen>) {
+fn cleanup(mut commands: Commands, loading_screen: Res<LoadingScreen>) {
     // trace!("very noisy");
     // debug!("helpful for debugging");
     // info!("helpful information that is worth printing by default");
     // warn!("something bad happened that isn't a failure, but thats worth calling out");
     // error!("something failed");
 
-    commands.despawn_recursive(loading_screen.entity);
+    commands.entity(loading_screen.entity).despawn_recursive();
 }

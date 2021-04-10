@@ -6,13 +6,13 @@ pub struct WindowPlugin;
 
 impl Plugin for WindowPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.add_resource(WindowDescriptor {
+        app.insert_resource(WindowDescriptor {
             title: "Atomic Bomberman".to_string(),
             width: 640. * 2.,
             height: 480. * 2.,
             ..Default::default()
         })
-        .add_resource(ClearColor(Color::rgb(0.04, 0.04, 0.04)))
+        .insert_resource(ClearColor(Color::rgb(0.04, 0.04, 0.04)))
         .add_startup_system(setup.system())
         .add_system(window_resize.system());
     }
@@ -20,18 +20,18 @@ impl Plugin for WindowPlugin {
 
 pub struct WindowTransform;
 
-fn setup(commands: &mut Commands) {
+fn setup(mut commands: Commands) {
     commands
-        .spawn(Camera2dBundle::default())
-        .with(WindowTransform);
+        .spawn_bundle(OrthographicCameraBundle::new_2d())
+        // .spawn_bundle(UiCameraBundle::default())
+        .insert(WindowTransform);
 }
 
 fn window_resize(
-    resize_event: Res<Events<WindowResized>>,
+    mut resize_events_reader: EventReader<WindowResized>,
     mut query: Query<&mut Transform, With<WindowTransform>>,
 ) {
-    let mut event_reader = resize_event.get_reader();
-    for event in event_reader.iter(&resize_event) {
+    for event in resize_events_reader.iter() {
         for mut transform in query.iter_mut() {
             transform.scale.x = 640. / event.width;
             transform.scale.y = 480. / event.height;
