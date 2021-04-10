@@ -7,7 +7,7 @@ use bevy::{
     utils::BoxedFuture,
 };
 use byteorder::{ReadBytesExt, LE};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
@@ -354,11 +354,13 @@ impl<'a> Decoder<'a> {
                 // );
             }
 
+            let mut unique_colors: HashSet<(u8, u8, u8)> = HashSet::new();
+
             // Convert the 16 bit color values to 32bit RGBA. The 16 bit pixel
             // format has support for an alpha channel (the highest bit) but
             // that is not used. Instead alpha is set to all pixels that match
             // `transparent`.
-            TgaRleIterator::new(&mut self.cursor)
+            let data = TgaRleIterator::new(&mut self.cursor)
                 .take((width * height) as usize)
                 .flat_map(|v: u16| {
                     if v == transparent || v & 0b1000_0000_0000_0000 != 0 {
@@ -367,10 +369,14 @@ impl<'a> Decoder<'a> {
                         let r = (((v & 0b0111_1100_0000_0000) >> 10) << 3) as u8;
                         let g = (((v & 0b0000_0011_1110_0000) >> 5) << 3) as u8;
                         let b = ((v & 0b0000_0000_0001_1111) << 3) as u8;
+                        unique_colors.insert((r, g, b));
                         vec![r, g, b, 255]
                     }
                 })
-                .collect()
+                .collect();
+
+            println!("unique colors = {}", unique_colors.len());
+            data
         } else {
             if palette_size.is_none() || palette_size.unwrap() != 1024 {
                 bail!("CIMG 8bpp expected a palette size of 1024");

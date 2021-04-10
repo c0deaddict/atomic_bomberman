@@ -28,5 +28,6 @@ in pkgs.mkShell {
 
   shellHook = ''
     export RUSTFLAGS="-l vulkan"
+    export VK_ICD_FILENAMES="/run/opengl-driver/share/vulkan/icd.d/intel_icd.x86_64.json"
   '';
 }

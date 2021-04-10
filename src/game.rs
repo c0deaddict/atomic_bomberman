@@ -85,6 +85,7 @@ fn setup(
     //   WALK.ANI for walking
 
     let background_handle = asset_server.load("data/RES/FIELD0.PCX");
+    // let background_handle = asset_server.load("color.pal");
     commands.spawn(SpriteBundle {
         material: materials.add(background_handle.into()),
         transform: Transform::from_translation(Vec3::new(320., -240., 0.)),
