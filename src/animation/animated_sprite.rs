@@ -36,7 +36,7 @@ impl AnimatedSprite {
                 ..Default::default()
             })
             .with(AnimatedSprite {
-                animation: animation.clone(),
+                animation,
                 index: 0,
             })
             // TODO: only add timer if animation.frames().len > 1
@@ -56,7 +56,7 @@ impl AnimatedSprite {
                 ..Default::default()
             })
             .with(AnimatedSprite {
-                animation: animation.clone(),
+                animation,
                 index: 0,
             })
             // TODO: only add timer if animation.frames().len > 1

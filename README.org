@@ -3,51 +3,6 @@
 * Prior art
 https://github.com/HerbFargus/Atomic-Bomberman
 
-* WIP
-** Asset loader for RSS
-** Asset loader for ANI
-** Asset loader for PCX
-
-* DATA
-** DONE Sounds
-Files are in =/data/DATA/SOUND/=.
-Data is in RSS format (raw sound stream).
-Raw format is: 44100Hz PCM signed 16bit, little endian, mono.
-https://twigstechtips.blogspot.com/2011/02/atomic-bomberman-how-to-open-rss-sound.html
-
-#+begin_src bash
-aplay -t raw -c1 -r44100 -fS16_LE ./ADD57A.RSS
-#+end_src
-
-https://github.com/bevyengine/bevy/blob/master/examples/asset/custom_asset.rs
-
-https://github.com/bevyengine/bevy/blob/dd668c1970cdf555f3fc08861a7781d3c9544d60/crates/bevy_audio/src/audio_source.rs
-convert to wav? rodio is used under the hood, that supports wav.
-https://github.com/RustAudio/rodio/blob/master/src/decoder/mod.rs
-
-** Animations
-In directory =/data/DATA/ANI=.
-Extension is =.ANI= with a magic of =CHFILEANI=
-Doesn't seem to be an official format.
-
-https://github.com/mmatyas/ab_aniex/blob/master/src/AniFile.cpp
-https://github.com/mattiz/JBomberman/blob/master/src/main/java/org/moogirc/jbomberman/parsers/AnimationParser.java
-
-** DONE Images
-=/data/DATA/RES=
-in PCX format (https://en.wikipedia.org/wiki/PCX)
-
-Imagemagick can display images:
-#+begin_src bash
-display MAINMENU.PCX
-#+end_src
-
-https://github.com/bevyengine/bevy/blob/acc29ec719814d4814444d26cca023c08307c316/crates/bevy_render/src/texture/image_texture_loader.rs
-
-** Schemes
-Level layout files, are in ASCII readable format.
-
-
-** COLOR.PAL
+* COLOR.PAL
 
 https://falloutmods.fandom.com/wiki/PAL_File_Format

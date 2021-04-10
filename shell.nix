@@ -6,7 +6,7 @@ let
 in pkgs.mkShell {
   buildInputs = with pkgs; [
     (rust-bin.nightly.latest.rust.override {
-        extensions = [ "rust-src" ];
+      extensions = [ "rust-src" ];
     })
 
     alsaLib
