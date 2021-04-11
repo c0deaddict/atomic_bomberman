@@ -31,7 +31,7 @@ struct FpsText;
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
-        .spawn_bundle(TextBundle {
+        .spawn_bundle(Text2dBundle {
             text: Text::with_section(
                 "FPS".to_string(),
                 TextStyle {

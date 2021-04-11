@@ -23,7 +23,6 @@ pub struct WindowTransform;
 fn setup(mut commands: Commands) {
     commands
         .spawn_bundle(OrthographicCameraBundle::new_2d())
-        // .spawn_bundle(UiCameraBundle::default())
         .insert(WindowTransform);
 }
 

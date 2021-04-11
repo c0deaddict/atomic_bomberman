@@ -71,6 +71,8 @@ impl PlayerDirection {
 
 struct PlaceBombEvent(Pos);
 
+// TODO: use vec math
+// https://github.com/bevyengine/bevy/blob/v0.5.0/examples/2d/many_sprites.rs
 fn pos_to_vec(pos: &Pos) -> Vec3 {
     Vec3::new(20.0 + pos.x as f32 * 40.0, -64.0 - pos.y as f32 * 36.0, 0.0)
 }
@@ -120,16 +122,13 @@ fn setup(
             let shadow = named_assets.animations.get("shadow").unwrap();
 
             parent
-                .spawn_bundle((
-                    Transform::from_translation(Vec3::new(0.0, -35.0, 0.0)),
-                    GlobalTransform::default(),
-                ))
-                .insert_bundle(
-                    AnimatedSpriteBundle::new(shadow.clone(), &animation_assets)
-                );
+                .spawn_bundle(AnimatedSpriteBundle::new(
+                    shadow.clone(), &animation_assets,
+                    Transform::from_translation(Vec3::new(0.0, -35.0, 0.0))
+                ));
 
             parent.spawn_bundle(
-                AnimatedSpriteBundle::new(animation.clone(), &animation_assets)
+                AnimatedSpriteBundle::new(animation.clone(), &animation_assets, Default::default())
             );
         });
 
@@ -163,7 +162,7 @@ fn setup(
                 .insert(cell)
                 .insert(pos)
                 .with_children(|parent| {
-                    parent.spawn_bundle(AnimatedSpriteBundle::new(animation.clone(), &animation_assets));
+                    parent.spawn_bundle(AnimatedSpriteBundle::new(animation.clone(), &animation_assets, Default::default()));
                 });
         }
     }
@@ -275,7 +274,7 @@ fn place_bomb(
                 .insert(event.0)
                 .insert(Timer::from_seconds(3.0, false))
                 .with_children(|parent| {
-                    parent.spawn_bundle(AnimatedSpriteBundle::new(animation.clone(), &animation_assets));
+                    parent.spawn_bundle(AnimatedSpriteBundle::new(animation.clone(), &animation_assets, Default::default()));
                 });
 
             let handle = named_assets.sounds.get("bmdrop2").unwrap();
@@ -318,13 +317,18 @@ fn trigger_bomb(
 
             let flame = commands
                 .spawn_bundle((
-                    Transform::from_translation(pos_to_vec(&pos) + Vec3::new(21., -19., 0.)),
                     GlobalTransform::default(),
+                    Transform::from_translation(pos_to_vec(&pos) + Vec3::new(21., -19., 0.)),
                 ))
                 .insert(Flame)
-                .insert(Timer::from_seconds(0.5, false))
+                .insert(Timer::from_seconds(5.0, false))
                 .with_children(|parent| {
-                    parent.spawn_bundle(AnimatedSpriteBundle::new(center.clone(), &animation_assets));
+                    parent.spawn_bundle(
+                        AnimatedSpriteBundle::new(
+                            center.clone(), &animation_assets,
+                            Default::default(),
+                        )
+                    );
                 })
                 .id();
 
@@ -354,13 +358,12 @@ fn trigger_bomb(
                 }
 
                 let part = commands
-                    .spawn_bundle((
-                        Transform::from_translation(Vec3::new((x - pos.x) as f32 * 40., -6., 0.)),
-                        GlobalTransform::default(),
-                    ))
-                    .with_children(|parent| {
-                        parent.spawn_bundle(AnimatedSpriteBundle::new(midwest.clone(), &animation_assets));
-                    })
+                    .spawn_bundle(
+                        AnimatedSpriteBundle::new(
+                            midwest.clone(), &animation_assets,
+                            Transform::from_translation(Vec3::new((x - pos.x) as f32 * 40., -6., 0.)),
+                        )
+                    )
                     .id();
 
                 commands.entity(flame).push_children(&[part]);
@@ -384,13 +387,12 @@ fn trigger_bomb(
                 }
 
                 let part = commands
-                    .spawn_bundle((
-                        Transform::from_translation(Vec3::new((x - pos.x) as f32 * 40.0, -4., 0.)),
-                        GlobalTransform::default(),
-                    ))
-                    .with_children(|parent| {
-                        parent.spawn_bundle(AnimatedSpriteBundle::new(mideast.clone(), &animation_assets));
-                    })
+                    .spawn_bundle(
+                        AnimatedSpriteBundle::new(
+                            mideast.clone(), &animation_assets,
+                            Transform::from_translation(Vec3::new((x - pos.x) as f32 * 40.0, -4., 0.)),
+                        )
+                    )
                     .id();
 
                 commands.entity(flame).push_children(&[part]);
@@ -419,7 +421,7 @@ fn trigger_bomb(
                         GlobalTransform::default(),
                     ))
                     .with_children(|parent| {
-                        parent.spawn_bundle(AnimatedSpriteBundle::new(midnorth.clone(), &animation_assets));
+                        parent.spawn_bundle(AnimatedSpriteBundle::new(midnorth.clone(), &animation_assets, Default::default()));
                     })
                     .id();
 
@@ -449,7 +451,7 @@ fn trigger_bomb(
                         GlobalTransform::default(),
                     ))
                     .with_children(|parent| {
-                        parent.spawn_bundle(AnimatedSpriteBundle::new(midsouth.clone(), &animation_assets));
+                        parent.spawn_bundle(AnimatedSpriteBundle::new(midsouth.clone(), &animation_assets, Default::default()));
                     })
                     .id();
 
@@ -490,7 +492,7 @@ fn change_sprite(
             .unwrap();
 
         let child = commands
-            .spawn_bundle(AnimatedSpriteBundle::new(animation.clone(), &animation_assets))
+            .spawn_bundle(AnimatedSpriteBundle::new(animation.clone(), &animation_assets, Default::default()))
             .id();
 
         commands.entity(entity).push_children(&[child]);

@@ -293,7 +293,7 @@ fn setup(
         })
         .with_children(|parent| {
             parent
-                .spawn_bundle(TextBundle {
+                .spawn_bundle(Text2dBundle {
                     text: Text::with_section(
                         "Loading...".to_string(),
                         TextStyle {
