@@ -5,9 +5,13 @@ use bevy::prelude::*;
 #[derive(Default)]
 pub struct AnimatedSpritePlugin;
 
+struct AnimationTimer(Timer);
+
 impl Plugin for AnimatedSpritePlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.add_system(animate_sprite.system());
+        app
+            .insert_resource(AnimationTimer(Timer::from_seconds(1. / 25., true)))
+            .add_system(animate_sprite.system());
     }
 }
 
@@ -21,7 +25,6 @@ pub struct AnimatedSpriteBundle {
     #[bundle]
     pub sprite_sheet: SpriteSheetBundle,
 
-    pub timer: Timer,
     pub animated_sprite: AnimatedSprite,
     // TODO: playing: bool
     // TODO: speed: float (fps?)
@@ -41,8 +44,6 @@ impl AnimatedSpriteBundle {
                 sprite: TextureAtlasSprite::new(asset.frames[0].index as u32),
                 ..Default::default()
             },
-            // TODO: only add timer if animation.frames().len > 1
-            timer: Timer::from_seconds(1. / 25., true),
             animated_sprite: AnimatedSprite {
                 animation,
                 index: 0,
@@ -53,15 +54,18 @@ impl AnimatedSpriteBundle {
 
 fn animate_sprite(
     time: Res<Time>,
-    mut query: Query<(&mut Timer, &mut TextureAtlasSprite, &mut AnimatedSprite)>,
     animation_assets: Res<Assets<Animation>>,
+    mut timer: ResMut<AnimationTimer>,
+    mut query: Query<(&mut TextureAtlasSprite, &mut AnimatedSprite)>,
 ) {
-    for (mut timer, mut sprite, mut animate_sprite) in query.iter_mut() {
-        let animation = animation_assets.get(&animate_sprite.animation).unwrap();
-        timer.tick(time.delta());
-        if timer.finished() {
-            animate_sprite.index = (animate_sprite.index + 1) % animation.frames.len();
-            sprite.index = animation.frames[animate_sprite.index].index as u32;
+    timer.0.tick(time.delta());
+    if timer.0.finished() {
+        for (mut sprite, mut animate_sprite) in query.iter_mut() {
+            let animation = animation_assets.get(&animate_sprite.animation).unwrap();
+            if animation.frames.len() > 1 {
+                animate_sprite.index = (animate_sprite.index + 1) % animation.frames.len();
+                sprite.index = animation.frames[animate_sprite.index].index as u32;
+            }
         }
     }
 }

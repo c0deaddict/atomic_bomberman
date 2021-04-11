@@ -224,7 +224,7 @@ fn player_movement(
     let occupied: HashSet<Pos> = queries.q1()
         .iter()
         .filter(|(cell, _pos)| cell != &&Cell::Blank)
-        .map(|(_cell, pos)| pos.clone())
+        .map(|(_cell, pos)| *pos)
         .collect();
 
     for (mut timer, mut transform, mut pos, player_direction) in queries.q0_mut().iter_mut() {
