@@ -1,6 +1,6 @@
 use super::Animation;
-use bevy::prelude::*;
 use bevy::ecs::bundle::Bundle;
+use bevy::prelude::*;
 
 #[derive(Default)]
 pub struct AnimatedSpritePlugin;
@@ -11,24 +11,31 @@ impl Plugin for AnimatedSpritePlugin {
     }
 }
 
-#[derive(Bundle)]
 pub struct AnimatedSprite {
+    pub animation: Handle<Animation>,
+    pub index: usize,
+}
+
+#[derive(Bundle)]
+pub struct AnimatedSpriteBundle {
     #[bundle]
     pub sprite_sheet: SpriteSheetBundle,
 
     pub timer: Timer,
-    pub animation: Handle<Animation>,
-    pub index: usize,
+    pub animated_sprite: AnimatedSprite,
     // TODO: playing: bool
     // TODO: speed: float (fps?)
     // TODO: fire event when done?
 }
 
 // TODO: option to attach multiple spritesheetbundles
-impl AnimatedSprite {
-    pub fn new(animation: Handle<Animation>, animation_assets: &Assets<Animation>) -> AnimatedSprite {
+impl AnimatedSpriteBundle {
+    pub fn new(
+        animation: Handle<Animation>,
+        animation_assets: &Assets<Animation>,
+    ) -> AnimatedSpriteBundle {
         let asset = animation_assets.get(&animation).unwrap();
-        AnimatedSprite {
+        AnimatedSpriteBundle {
             sprite_sheet: SpriteSheetBundle {
                 texture_atlas: asset.atlas.texture.clone(),
                 sprite: TextureAtlasSprite::new(asset.frames[0].index as u32),
@@ -36,8 +43,10 @@ impl AnimatedSprite {
             },
             // TODO: only add timer if animation.frames().len > 1
             timer: Timer::from_seconds(1. / 25., true),
-            animation,
-            index: 0,
+            animated_sprite: AnimatedSprite {
+                animation,
+                index: 0,
+            },
         }
     }
 }

@@ -125,11 +125,11 @@ fn setup(
                     GlobalTransform::default(),
                 ))
                 .insert_bundle(
-                    AnimatedSprite::new(shadow.clone(), &animation_assets)
+                    AnimatedSpriteBundle::new(shadow.clone(), &animation_assets)
                 );
 
             parent.spawn_bundle(
-                AnimatedSprite::new(animation.clone(), &animation_assets)
+                AnimatedSpriteBundle::new(animation.clone(), &animation_assets)
             );
         });
 
@@ -163,7 +163,7 @@ fn setup(
                 .insert(cell)
                 .insert(pos)
                 .with_children(|parent| {
-                    parent.spawn_bundle(AnimatedSprite::new(animation.clone(), &animation_assets));
+                    parent.spawn_bundle(AnimatedSpriteBundle::new(animation.clone(), &animation_assets));
                 });
         }
     }
@@ -275,7 +275,7 @@ fn place_bomb(
                 .insert(event.0)
                 .insert(Timer::from_seconds(3.0, false))
                 .with_children(|parent| {
-                    parent.spawn_bundle(AnimatedSprite::new(animation.clone(), &animation_assets));
+                    parent.spawn_bundle(AnimatedSpriteBundle::new(animation.clone(), &animation_assets));
                 });
 
             let handle = named_assets.sounds.get("bmdrop2").unwrap();
@@ -324,7 +324,7 @@ fn trigger_bomb(
                 .insert(Flame)
                 .insert(Timer::from_seconds(0.5, false))
                 .with_children(|parent| {
-                    parent.spawn_bundle(AnimatedSprite::new(center.clone(), &animation_assets));
+                    parent.spawn_bundle(AnimatedSpriteBundle::new(center.clone(), &animation_assets));
                 })
                 .id();
 
@@ -359,7 +359,7 @@ fn trigger_bomb(
                         GlobalTransform::default(),
                     ))
                     .with_children(|parent| {
-                        parent.spawn_bundle(AnimatedSprite::new(midwest.clone(), &animation_assets));
+                        parent.spawn_bundle(AnimatedSpriteBundle::new(midwest.clone(), &animation_assets));
                     })
                     .id();
 
@@ -389,7 +389,7 @@ fn trigger_bomb(
                         GlobalTransform::default(),
                     ))
                     .with_children(|parent| {
-                        parent.spawn_bundle(AnimatedSprite::new(mideast.clone(), &animation_assets));
+                        parent.spawn_bundle(AnimatedSpriteBundle::new(mideast.clone(), &animation_assets));
                     })
                     .id();
 
@@ -419,7 +419,7 @@ fn trigger_bomb(
                         GlobalTransform::default(),
                     ))
                     .with_children(|parent| {
-                        parent.spawn_bundle(AnimatedSprite::new(midnorth.clone(), &animation_assets));
+                        parent.spawn_bundle(AnimatedSpriteBundle::new(midnorth.clone(), &animation_assets));
                     })
                     .id();
 
@@ -449,7 +449,7 @@ fn trigger_bomb(
                         GlobalTransform::default(),
                     ))
                     .with_children(|parent| {
-                        parent.spawn_bundle(AnimatedSprite::new(midsouth.clone(), &animation_assets));
+                        parent.spawn_bundle(AnimatedSpriteBundle::new(midsouth.clone(), &animation_assets));
                     })
                     .id();
 
@@ -490,7 +490,7 @@ fn change_sprite(
             .unwrap();
 
         let child = commands
-            .spawn_bundle(AnimatedSprite::new(animation.clone(), &animation_assets))
+            .spawn_bundle(AnimatedSpriteBundle::new(animation.clone(), &animation_assets))
             .id();
 
         commands.entity(entity).push_children(&[child]);

@@ -8,5 +8,5 @@ edition = "2018"
 
 [dependencies]
 bevy = { version = "0.5", features = ["wav"] }
-anyhow = "1.0"
+anyhow = "1"
 byteorder = "1"
