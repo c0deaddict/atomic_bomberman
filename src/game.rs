@@ -1,16 +1,17 @@
 use crate::{
     animation::*,
     asset_loaders::*,
-    state::*,
-    player::{*, Direction},
     bomb::*,
-    grid::*,
-    // flame::FlamePlugin,
+    grid::{Direction, *},
+    player::*,
+    state::*,
 };
 use bevy::prelude::*;
 
 #[derive(Default)]
 pub struct GamePlugin;
+
+pub struct PlayerPosText;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut AppBuilder) {
@@ -18,8 +19,10 @@ impl Plugin for GamePlugin {
             .add_plugin(GridPlugin)
             .add_plugin(PlayerPlugin)
             .add_plugin(BombPlugin)
-            // .add_plugin(FlamePlugin)
             .add_system_set(SystemSet::on_enter(AppState::Game).with_system(setup.system()))
+            .add_system_set(
+                SystemSet::on_update(AppState::Game).with_system(player_pos_text.system()),
+            )
             .add_system_set(SystemSet::on_exit(AppState::Game).with_system(cleanup.system()));
     }
 }
@@ -70,16 +73,37 @@ fn setup(
         .with_children(|parent| {
             let shadow = named_assets.animations.get("shadow").unwrap();
 
-            parent
-                .spawn_bundle(AnimatedSpriteBundle::new(
-                    shadow.clone(), &animation_assets,
-                    Transform::from_translation(Vec3::new(0.0, -35.0, 0.0))
-                ));
+            parent.spawn_bundle(AnimatedSpriteBundle::new(
+                shadow.clone(),
+                &animation_assets,
+                Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)),
+            ));
 
-            parent.spawn_bundle(
-                AnimatedSpriteBundle::new(animation.clone(), &animation_assets, Default::default())
-            );
+            parent.spawn_bundle(AnimatedSpriteBundle::new(
+                animation.clone(),
+                &animation_assets,
+                Transform::from_translation(Vec3::new(0.0, 35.0, 0.0)),
+            ));
         });
+
+    commands
+        .spawn_bundle(Text2dBundle {
+            text: Text::with_section(
+                "Pos".to_string(),
+                TextStyle {
+                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                    font_size: 16.0,
+                    color: Color::WHITE,
+                },
+                TextAlignment {
+                    vertical: VerticalAlign::Bottom,
+                    horizontal: HorizontalAlign::Right,
+                },
+            ),
+            transform: Transform::from_translation(Vec3::new(320., -5., 100.)),
+            ..Default::default()
+        })
+        .insert(PlayerPosText);
 
     let scheme = scheme_assets
         .get(named_assets.schemes.get("X MARKS THE SPOT (10)").unwrap())
@@ -99,15 +123,70 @@ fn setup(
             };
 
             commands
-                .spawn_bundle(AnimatedSpriteBundle::new(animation.clone(), &animation_assets, Default::default()))
-                .insert(Position { x: x as i32, y: y as i32 })
-                .insert(Offset(Vec3::new(20.0, -18.0, 20.0)))
+                .spawn_bundle(AnimatedSpriteBundle::new(
+                    animation.clone(),
+                    &animation_assets,
+                    Default::default(),
+                ))
+                .insert(Position {
+                    x: x as i32,
+                    y: y as i32,
+                })
+                .insert(Offset(Vec3::new(0.0, 0.0, 20.0)))
                 .insert(SnapToGrid)
                 .insert(cell);
         }
+    }
+
+    // Draw a grid over the screen.
+    let blue = materials.add(Color::rgb(0.0, 0.0, 1.0).into());
+    for x in 0..16 {
+        commands.spawn_bundle(SpriteBundle {
+            material: blue.clone(),
+            sprite: Sprite::new(Vec2::new(1.0, 480.0)),
+            transform: Transform::from_translation(Vec3::new(
+                20.0 + (x as f32) * 40.0,
+                -240.0,
+                50.0,
+            )),
+            ..Default::default()
+        });
+    }
+
+    for y in 0..12 {
+        commands.spawn_bundle(SpriteBundle {
+            material: blue.clone(),
+            sprite: Sprite::new(Vec2::new(640.0, 1.0)),
+            transform: Transform::from_translation(Vec3::new(
+                320.0,
+                -64.0 + (y as f32) * -36.0,
+                50.0,
+            )),
+            visible: Visible {
+                is_transparent: true,
+                is_visible: true,
+            },
+            ..Default::default()
+        });
     }
 }
 
 fn cleanup() {
     info!("cleanup");
+}
+
+fn player_pos_text(
+    mut queries: QuerySet<(
+        Query<&mut Text, With<PlayerPosText>>,
+        Query<&Position, With<Player>>,
+    )>,
+) {
+    let mut p = Position { x: 0, y: 0 };
+    for pos in queries.q1().iter() {
+        p = *pos
+    }
+
+    for mut text in queries.q0_mut().iter_mut() {
+        text.sections[0].value = format!("{}x{}", p.x, p.y);
+    }
 }

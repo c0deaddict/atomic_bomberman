@@ -36,7 +36,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 "FPS".to_string(),
                 TextStyle {
                     font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                    font_size: 20.0,
+                    font_size: 16.0,
                     color: Color::WHITE,
                 },
                 TextAlignment {
@@ -44,7 +44,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                     horizontal: HorizontalAlign::Right,
                 },
             ),
-            transform: Transform::from_translation(Vec3::new(2., -2., 3.)),
+            transform: Transform::from_translation(Vec3::new(10., -5., 100.)),
             ..Default::default()
         })
         .insert(FpsText);

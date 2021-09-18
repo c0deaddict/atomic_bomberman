@@ -1,6 +1,11 @@
-use crate::{animation::*, asset_loaders::*, bomb::PlaceBombEvent, grid::Position, state::*};
+use crate::{
+    animation::*,
+    asset_loaders::*,
+    bomb::PlaceBombEvent,
+    grid::{Direction, Position},
+    state::*,
+};
 use bevy::{input::keyboard::KeyboardInput, prelude::*};
-use std::cmp::{Eq, PartialEq};
 use std::collections::HashSet;
 use std::fmt::Debug;
 
@@ -16,14 +21,6 @@ impl Plugin for PlayerPlugin {
                 .with_system(change_sprite.system()),
         );
     }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Direction {
-    North,
-    South,
-    East,
-    West,
 }
 
 pub struct Player;
@@ -91,7 +88,7 @@ fn keyboard_handling(
                         player_direction.walking = false;
                     }
                 } else if event.state.is_pressed() && key_code == KeyCode::Space {
-                    place_bomb_events.send(PlaceBombEvent(pos.clone()));
+                    place_bomb_events.send(PlaceBombEvent(*pos));
                 }
             }
         }
@@ -158,7 +155,9 @@ fn change_sprite(
             .spawn_bundle(AnimatedSpriteBundle::new(
                 animation.clone(),
                 &animation_assets,
-                Default::default(),
+                // 55 = 110 (height) / 2, 18 = 36 (tile height) / 2
+                // when position is translated into vec2, it points to the center, hence the correction for -18.
+                Transform::from_translation(Vec3::new(0.0, 55.0 - 18.0, 0.0)),
             ))
             .id();
 

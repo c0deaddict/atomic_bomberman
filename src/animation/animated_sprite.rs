@@ -11,9 +11,11 @@ const ANIMATION_FPS: f32 = 25.;
 
 impl Plugin for AnimatedSpritePlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app
-            .insert_resource(AnimationTimer(Timer::from_seconds(1. / ANIMATION_FPS, true)))
-            .add_system(animate_sprite.system());
+        app.insert_resource(AnimationTimer(Timer::from_seconds(
+            1. / ANIMATION_FPS,
+            true,
+        )))
+        .add_system(animate_sprite.system());
     }
 }
 
@@ -40,6 +42,7 @@ impl AnimatedSpriteBundle {
         transform: Transform,
     ) -> AnimatedSpriteBundle {
         let asset = animation_assets.get(&animation).unwrap();
+
         AnimatedSpriteBundle {
             sprite_sheet: SpriteSheetBundle {
                 texture_atlas: asset.atlas.texture.clone(),
@@ -68,6 +71,8 @@ fn animate_sprite(
             if animation.frames.len() > 1 {
                 animate_sprite.index = (animate_sprite.index + 1) % animation.frames.len();
                 sprite.index = animation.frames[animate_sprite.index].index as u32;
+                // transform.translation.x = animation.frames[animate_sprite.index].offset_x as f32;
+                // transform.translation.y = animation.frames[animate_sprite.index].offset_y as f32;
             }
         }
     }
