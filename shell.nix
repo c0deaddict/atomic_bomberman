@@ -5,29 +5,39 @@ let
 
 in pkgs.mkShell {
   buildInputs = with pkgs; [
-    (rust-bin.nightly.latest.rust.override {
-      extensions = [ "rust-src" ];
+    (rust-bin.nightly.latest.default.override {
+      extensions = [
+        "cargo"
+        "rust-src"
+        "rust-analyzer-preview"
+        "clippy"
+        "rustfmt"
+      ];
     })
 
+    cargo-edit
+
+    # bevy-specific deps (from https://github.com/bevyengine/bevy/blob/main/docs/linux_dependencies.md)
+    pkgconfig
+    udev
     alsaLib
     lutris
-    pkgconfig
-    vulkan-headers
-    vulkan-loader
-    vulkan-tools
     x11
     xorg.libXcursor
-    xorg.libXi
     xorg.libXrandr
-    libudev
+    xorg.libXi
+    vulkan-tools
+    vulkan-headers
+    vulkan-loader
+    vulkan-validation-layers
 
-    # https://bevyengine.org/learn/book/getting-started/setup/
+    # Fast compilation
     clang
     llvmPackages.lld
   ];
 
   shellHook = ''
-    export RUSTFLAGS="-l vulkan"
-    export VK_ICD_FILENAMES="/run/opengl-driver/share/vulkan/icd.d/intel_icd.x86_64.json"
-  '';
+    export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${
+      pkgs.lib.makeLibraryPath [ pkgs.alsaLib pkgs.udev pkgs.vulkan-loader ]
+    }"'';
 }
