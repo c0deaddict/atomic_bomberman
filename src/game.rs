@@ -137,38 +137,6 @@ fn setup(
                 .insert(cell);
         }
     }
-
-    // Draw a grid over the screen.
-    let blue = materials.add(Color::rgb(0.0, 0.0, 1.0).into());
-    for x in 0..16 {
-        commands.spawn_bundle(SpriteBundle {
-            material: blue.clone(),
-            sprite: Sprite::new(Vec2::new(1.0, 480.0)),
-            transform: Transform::from_translation(Vec3::new(
-                20.0 + (x as f32) * 40.0,
-                -240.0,
-                50.0,
-            )),
-            ..Default::default()
-        });
-    }
-
-    for y in 0..12 {
-        commands.spawn_bundle(SpriteBundle {
-            material: blue.clone(),
-            sprite: Sprite::new(Vec2::new(640.0, 1.0)),
-            transform: Transform::from_translation(Vec3::new(
-                320.0,
-                -64.0 + (y as f32) * -36.0,
-                50.0,
-            )),
-            visible: Visible {
-                is_transparent: true,
-                is_visible: true,
-            },
-            ..Default::default()
-        });
-    }
 }
 
 fn cleanup() {

@@ -124,7 +124,7 @@ fn player_movement(
 
             let collision = occupied.contains(&new_pos);
 
-            if !collision {
+            if !collision && new_pos.valid() {
                 transform.translation.x = new_translation.x;
                 transform.translation.y = new_translation.y;
                 pos.x = new_pos.x;

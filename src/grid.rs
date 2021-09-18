@@ -1,4 +1,5 @@
 use crate::state::*;
+use bevy::input::keyboard::KeyboardInput;
 use bevy::{math::const_vec2, prelude::*};
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
@@ -12,9 +13,10 @@ impl Plugin for GridPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_system_set_to_stage(
             CoreStage::PostUpdate,
-            SystemSet::new()
-                .with_system(position_translation.system())
-        );
+            SystemSet::new().with_system(position_translation.system()),
+        )
+        .add_startup_system(setup.system())
+        .add_system(keyboard_handling.system());
     }
 }
 
@@ -36,6 +38,8 @@ pub struct Offset(pub Vec3);
 
 pub struct SnapToGrid;
 
+pub struct DebugGrid;
+
 pub const WIDTH: i32 = 15;
 pub const HEIGHT: i32 = 11;
 
@@ -54,8 +58,8 @@ impl From<Vec2> for Position {
     fn from(v: Vec2) -> Self {
         let v = (v - GRID_OFFSET) / CELL_DIMENSION;
         Position {
-            x: v.x as i32,
-            y: v.y as i32,
+            x: if v.x < 0.0 { -1 } else { v.x as i32 },
+            y: if v.y < 0.0 { -1 } else { v.y as i32},
         }
     }
 }
@@ -72,7 +76,7 @@ pub struct PositionIterator {
 }
 
 impl Position {
-    fn valid(&self) -> bool {
+    pub fn valid(&self) -> bool {
         self.x >= 0 && self.y >= 0 && self.x < WIDTH && self.y < HEIGHT
     }
 
@@ -96,7 +100,10 @@ impl Position {
     }
 
     pub fn iter(&self, dir: Direction) -> PositionIterator {
-        PositionIterator{pos: Some(*self), dir}
+        PositionIterator {
+            pos: Some(*self),
+            dir,
+        }
     }
 }
 
@@ -116,5 +123,75 @@ impl Iterator for PositionIterator {
 impl Direction {
     pub fn iter() -> impl Iterator<Item = Direction> {
         [North, South, East, West].iter().copied()
+    }
+}
+
+fn setup(mut commands: Commands, mut materials: ResMut<Assets<ColorMaterial>>) {
+    // Draw a debug grid over the screen.
+    let blue = materials.add(Color::rgb(0.0, 0.0, 1.0).into());
+
+    for x in 0..16 {
+        commands
+            .spawn_bundle(SpriteBundle {
+                material: blue.clone(),
+                sprite: Sprite::new(Vec2::new(1.0, 480.0)),
+                transform: Transform::from_translation(Vec3::new(
+                    20.0 + (x as f32) * 40.0,
+                    -240.0,
+                    50.0,
+                )),
+                visible: Visible {
+                    is_transparent: true,
+                    is_visible: false,
+                },
+                ..Default::default()
+            })
+            .insert(DebugGrid);
+    }
+
+    for y in 0..12 {
+        commands
+            .spawn_bundle(SpriteBundle {
+                material: blue.clone(),
+                sprite: Sprite::new(Vec2::new(640.0, 1.0)),
+                transform: Transform::from_translation(Vec3::new(
+                    320.0,
+                    -64.0 + (y as f32) * -36.0,
+                    50.0,
+                )),
+                visible: Visible {
+                    is_transparent: true,
+                    is_visible: false,
+                },
+                ..Default::default()
+            })
+            .insert(DebugGrid);
+    }
+}
+
+fn keyboard_handling(
+    mut keyboard_events: EventReader<KeyboardInput>,
+    mut query: Query<&mut Visible, With<DebugGrid>>,
+) {
+    let mut visible: Option<bool> = None;
+
+    for event in keyboard_events.iter() {
+        if event.state.is_pressed() {
+            if let Some(key_code) = event.key_code {
+                if key_code == KeyCode::G {
+                    println!("showing debug grid");
+                    visible = Some(true);
+                } else if key_code == KeyCode::H {
+                    visible = Some(false);
+                    println!("hiding debug grid");
+                }
+            }
+        }
+    }
+
+    if let Some(state) = visible {
+        for mut sprite in query.iter_mut() {
+            sprite.is_visible = state;
+        }
     }
 }

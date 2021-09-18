@@ -5,7 +5,7 @@ use crate::{
     state::*,
 };
 use bevy::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Default)]
 pub struct BombPlugin;
@@ -84,84 +84,89 @@ fn trigger_bomb(
         .map(|(pos, entity, cell)| (pos, (entity, cell)))
         .collect();
 
-    let mut bomb: Option<Position> = None;
+    let mut bombs: HashSet<Position> = HashSet::new();
+    let mut new_bombs: Vec<Position> = vec![];
     for (entity, pos, mut timer) in query.iter_mut() {
         timer.tick(time.delta());
         if timer.finished() {
-            // TODO: move despawn to after flame calc below.
+            bombs.insert(*pos);
+            new_bombs.push(*pos);
             commands.entity(entity).despawn_recursive();
-
-            bomb = Some(pos.clone());
             break;
         }
     }
 
-    if let Some(pos) = bomb {
-        println!("trigger_bomb {:?}", pos);
-        let handle = named_assets.sounds.get("explode2").unwrap();
-        audio.play(handle.clone());
+    if bombs.is_empty() {
+        return;
+    }
 
-        let mut flame: HashMap<Position, FlameCell> = HashMap::new();
+    let handle = named_assets.sounds.get("explode2").unwrap();
+    audio.play(handle.clone());
+
+    let mut flame: HashMap<Position, FlameCell> = HashMap::new();
+
+    while let Some(pos) = new_bombs.pop() {
         let strength = 3;
-        trace_flame(pos, strength, grid, &mut flame);
+        trace_flame(pos, strength, &grid, &mut flame);
 
-        // TODO: trigger other bombs in flame
-        // TODO: keep list of bombs that have already been processed.
-        for (_entity, pos, _timer) in query.iter_mut() {
-            if flame.contains_key(pos) {
+        for (entity, pos, _timer) in query.iter_mut() {
+            if !bombs.contains(pos) && flame.contains_key(pos) {
                 println!("trigger another bomb at {:?}", pos);
+                bombs.insert(*pos);
+                new_bombs.push(*pos);
+                commands.entity(entity).despawn_recursive();
             }
         }
+    }
 
-        let center = named_assets.animations.get("flame center green").unwrap();
-        let midwest = named_assets.animations.get("flame midwest green").unwrap();
-        let tipwest = named_assets.animations.get("flame tipwest green").unwrap();
-        let mideast = named_assets.animations.get("flame mideast green").unwrap();
-        let tipeast = named_assets.animations.get("flame tipeast green").unwrap();
-        let midnorth = named_assets.animations.get("flame midnorth green").unwrap();
-        let tipnorth = named_assets.animations.get("flame tipnorth green").unwrap();
-        let midsouth = named_assets.animations.get("flame midsouth green").unwrap();
-        let tipsouth = named_assets.animations.get("flame tipsouth green").unwrap();
+    let center = named_assets.animations.get("flame center green").unwrap();
+    let midwest = named_assets.animations.get("flame midwest green").unwrap();
+    let tipwest = named_assets.animations.get("flame tipwest green").unwrap();
+    let mideast = named_assets.animations.get("flame mideast green").unwrap();
+    let tipeast = named_assets.animations.get("flame tipeast green").unwrap();
+    let midnorth = named_assets.animations.get("flame midnorth green").unwrap();
+    let tipnorth = named_assets.animations.get("flame tipnorth green").unwrap();
+    let midsouth = named_assets.animations.get("flame midsouth green").unwrap();
+    let tipsouth = named_assets.animations.get("flame tipsouth green").unwrap();
 
-        let asset = animation_assets.get(midwest).unwrap();
-        println!("{:?}", asset);
+    let asset = animation_assets.get(midwest).unwrap();
+    println!("{:?}", asset);
 
-        // TODO: is it possible to spawn an "empty" parent?
-        let flame_entity = commands
-            .spawn_bundle((Transform::default(), GlobalTransform::default()))
-            .insert(Flame)
-            .insert(Timer::from_seconds(5.0, false))
+    // TODO: is it possible to spawn an "empty" parent?
+    let flame_entity = commands
+        .spawn_bundle((Transform::default(), GlobalTransform::default()))
+        .insert(Flame)
+        .insert(Timer::from_seconds(5.0, false))
+        .id();
+
+    for (pos, cell) in flame.iter() {
+        let (animation, offset) = match cell {
+            FlameCell::North => (midnorth, Vec2::new(7.0, 0.0)),
+            FlameCell::East => (midwest, Vec2::new(0.0, -7.0)),
+            FlameCell::South => (midsouth, Vec2::new(7.0, 0.0)),
+            FlameCell::West => (mideast, Vec2::new(0.0, -7.0)),
+            FlameCell::Center => (center, Vec2::new(0.0, 0.0)),
+        };
+
+        let part = commands
+            .spawn_bundle(AnimatedSpriteBundle::new(
+                animation.clone(),
+                &animation_assets,
+                Default::default(),
+            ))
+            .insert(*pos)
+            .insert(Offset(Vec3::from((offset, 25.0))))
+            .insert(SnapToGrid)
             .id();
 
-        for (pos, cell) in flame.iter() {
-            let (animation, offset) = match cell {
-                FlameCell::North => (midnorth, Vec2::new(7.0, 0.0)),
-                FlameCell::East => (midwest, Vec2::new(0.0, -7.0)),
-                FlameCell::South => (midsouth, Vec2::new(7.0, 0.0)),
-                FlameCell::West => (mideast, Vec2::new(0.0, -7.0)),
-                FlameCell::Center => (center, Vec2::new(0.0, 0.0)),
-            };
-
-            let part = commands
-                .spawn_bundle(AnimatedSpriteBundle::new(
-                    animation.clone(),
-                    &animation_assets,
-                    Default::default(),
-                ))
-                .insert(*pos)
-                .insert(Offset(Vec3::from((offset, 25.0))))
-                .insert(SnapToGrid)
-                .id();
-
-            commands.entity(flame_entity).push_children(&[part]);
-        }
+        commands.entity(flame_entity).push_children(&[part]);
     }
 }
 
 fn trace_flame(
     bomb: Position,
     strength: usize,
-    grid: HashMap<&Position, (Entity, &Cell)>,
+    grid: &HashMap<&Position, (Entity, &Cell)>,
     flame: &mut HashMap<Position, FlameCell>,
 ) {
     flame.insert(bomb, FlameCell::Center);
