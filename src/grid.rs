@@ -27,6 +27,12 @@ pub struct Position {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Axis {
+    Horizontal,
+    Vertical,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Direction {
     North,
     South,
@@ -123,6 +129,15 @@ impl Iterator for PositionIterator {
 impl Direction {
     pub fn iter() -> impl Iterator<Item = Direction> {
         [North, South, East, West].iter().copied()
+    }
+
+    pub fn axis(&self) -> Axis {
+        match self {
+            North => Axis::Vertical,
+            South => Axis::Vertical,
+            East => Axis::Horizontal,
+            West => Axis::Horizontal,
+        }
     }
 }
 

@@ -16,7 +16,8 @@ impl Plugin for BombPlugin {
             SystemSet::on_update(AppState::Game)
                 .with_system(place_bomb.system())
                 .with_system(trigger_bomb.system())
-                .with_system(flame_out.system()),
+                .with_system(flame_out.system())
+                .with_system(flame_brick_out.system()),
         );
     }
 }
@@ -24,6 +25,7 @@ impl Plugin for BombPlugin {
 pub struct Flame;
 pub struct Bomb;
 pub struct PlaceBombEvent(pub Position);
+pub struct FlameBrick;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FlameCell {
@@ -105,9 +107,29 @@ fn trigger_bomb(
 
     let mut flame: HashMap<Position, FlameCell> = HashMap::new();
 
+    let flamebrick = named_assets.animations.get("flame brick 0").unwrap();
+
     while let Some(pos) = new_bombs.pop() {
         let strength = 3;
-        trace_flame(pos, strength, &grid, &mut flame);
+        let bricks = trace_flame(pos, strength, &grid, &mut flame);
+        for (entity, pos) in bricks.iter() {
+            println!("destroying brick at {:?}", pos);
+            commands.entity(*entity).despawn_recursive();
+
+            commands
+                .spawn_bundle(AnimatedSpriteBundle::new(
+                    flamebrick.clone(),
+                    &animation_assets,
+                    Default::default(),
+                ))
+                .insert(*pos)
+                .insert(Offset(Vec3::new(0.0, 0.0, 25.0)))
+                .insert(SnapToGrid)
+                .insert(FlameBrick)
+                .insert(Timer::from_seconds(0.25, false));
+
+            // TODO: trigger event? spawn potential upgrades?
+        }
 
         for (entity, pos, _timer) in query.iter_mut() {
             if !bombs.contains(pos) && flame.contains_key(pos) {
@@ -136,7 +158,7 @@ fn trigger_bomb(
     let flame_entity = commands
         .spawn_bundle((Transform::default(), GlobalTransform::default()))
         .insert(Flame)
-        .insert(Timer::from_seconds(5.0, false))
+        .insert(Timer::from_seconds(0.75, false))
         .id();
 
     for (pos, cell) in flame.iter() {
@@ -168,16 +190,17 @@ fn trace_flame(
     strength: usize,
     grid: &HashMap<&Position, (Entity, &Cell)>,
     flame: &mut HashMap<Position, FlameCell>,
-) {
+) -> Vec<(Entity, Position)> {
+    let mut bricks = vec![];
+
     flame.insert(bomb, FlameCell::Center);
 
     for dir in Direction::iter() {
-        for pos in bomb.iter(dir).take(strength) {
+        for pos in bomb.iter(dir).take(strength - 1) {
             match grid.get(&pos) {
                 Some((_entity, Cell::Solid)) => break,
-                Some((_entity, Cell::Brick)) => {
-                    println!("destroying {:?}", pos);
-                    // commands.entity(*entity).despawn_recursive();
+                Some((entity, Cell::Brick)) => {
+                    bricks.push((*entity, pos));
                     break;
                 }
                 _ => {}
@@ -186,8 +209,7 @@ fn trace_flame(
             // TODO: could insert dir here into flame as hashmap
             // if pos already contains a dir, then create a "cross" at the point.
             if let Some(cell) = flame.get(&pos) {
-                // TODO: should determine if axis is different, eg [south, north] != [east, west]
-                if cell.dir() != Some(dir) {
+                if cell != &FlameCell::Center && cell.dir().unwrap().axis() != dir.axis() {
                     flame.insert(pos, FlameCell::Center);
                 }
             } else {
@@ -195,12 +217,27 @@ fn trace_flame(
             }
         }
     }
+
+    bricks
 }
 
 fn flame_out(
     mut commands: Commands,
     time: Res<Time>,
     mut query: Query<(Entity, &mut Timer), With<Flame>>,
+) {
+    for (entity, mut timer) in query.iter_mut() {
+        timer.tick(time.delta());
+        if timer.finished() {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
+}
+
+fn flame_brick_out(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut Timer), With<FlameBrick>>,
 ) {
     for (entity, mut timer) in query.iter_mut() {
         timer.tick(time.delta());

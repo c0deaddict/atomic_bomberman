@@ -76,7 +76,7 @@ const ANIMATION_LIST: &'static [&str] = &[
     // "TILES9.ANI",
     // "TRIGANIM.ANI",
     "WALK.ANI",
-    // "XBRICK0.ANI",
+    "XBRICK0.ANI",
     // "XBRICK1.ANI",
     // "XBRICK10.ANI",
     // "XBRICK2.ANI",
