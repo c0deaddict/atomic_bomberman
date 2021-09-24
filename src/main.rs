@@ -4,10 +4,28 @@ use bevy::{
     prelude::*,
 };
 
-// TODO: figure out how to remap colors for player and flame animations.
-// for each color there is RMP file in the root bomberman directory.
-// i guess the COLOR.PAL file also has to do something with it,
-// or maybe the palette header in the ANI files?
+// COLOR.PAL: (= palette)
+// 256 RGB colors (768 bytes).
+// 2^15 indices (1 byte) into color table (32768 bytes)
+//
+// *.RMP (color remap table):
+// 256 byte to byte mapping.
+//
+// v = 2^15 color from animation
+// remapped = palette[3 * rmp[palette[768 + v]]] # 3 bytes starting at this addr.
+//
+// Player colors:
+// 1 = white
+// 2 = black
+// 3 = red
+// 4 = blue
+// 5 = green
+// 6 = yellow
+// 7 = turqoise
+// 8 = pink
+// 9 = orange
+// 10 = purple
+
 
 fn main() {
     App::build()

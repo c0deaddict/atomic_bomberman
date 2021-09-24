@@ -15,15 +15,22 @@ impl AssetLoader for ColorPaletteAssetLoader {
         load_context: &'a mut LoadContext,
     ) -> BoxedFuture<'a, Result<()>> {
         Box::pin(async move {
-            let width = 150;
-            let height = bytes.len() / (3 * width);
+            let rmp = std::fs::read("/home/jos/tmp/BM95/6.RMP").unwrap();
 
+            let width = 128;
+            let height = 256;
             let mut image_data = vec![0; 4 * width * height];
-            let j = 2;
             for i in 0..width * height {
-                image_data[i * 4 + 0] = bytes[j + i * 3 + 0];
-                image_data[i * 4 + 1] = bytes[j + i * 3 + 1];
-                image_data[i * 4 + 2] = bytes[j + i * 3 + 2];
+                let idx = rmp[bytes[i + 768] as usize] as usize;
+                let r = bytes[idx * 3 + 0] << 2;
+                let g = bytes[idx * 3 + 1] << 2;
+                let b = bytes[idx * 3 + 2] << 2;
+                if i == 0x3e0 || i == 0x2a0 {
+                    println!("{:04x}: {:02x}{:02x}{:02x}", i, r, g, b);
+                }
+                image_data[i * 4 + 0] = r;
+                image_data[i * 4 + 1] = g;
+                image_data[i * 4 + 2] = b;
                 image_data[i * 4 + 3] = 255;
             }
 

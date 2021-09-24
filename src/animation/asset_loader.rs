@@ -171,10 +171,10 @@ impl<'a, 'b, T> TgaRleIterator<'a, 'b, T> {
 
 /// TGA run length encoding iterator.
 ///
-/// If hightest bit of the control byte is set, the next 16 bits are a pixel
+/// If hightest bit of the control byte is set, the next T bits are a pixel
 /// value that is to be repeated `control - highest bit` times.
 ///
-/// Otherwise `control` is interpreted as a count of consecutive 16 bits pixel
+/// Otherwise `control` is interpreted as a count of consecutive T bits pixel
 /// values that are read in order. This is called a "raw packet" in TGA.
 ///
 /// For more info see: http://www.ludorg.net/amnesia/TGA_File_Format_Spec.html
