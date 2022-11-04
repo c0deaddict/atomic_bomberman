@@ -1,7 +1,8 @@
 use anyhow::{bail, Result};
 use bevy::{
     asset::{AssetLoader, LoadContext, LoadedAsset},
-    render::texture::{Extent3d, Texture, TextureDimension, TextureFormat},
+    render::render_resource::{Extent3d, TextureDimension, TextureFormat},
+    render::texture::Image,
     utils::BoxedFuture,
 };
 use byteorder::{ReadBytesExt, LE};
@@ -253,7 +254,7 @@ impl<'a> PcxDecoder<'a> {
         Ok(())
     }
 
-    fn read_image_data(&mut self) -> Result<Texture> {
+    fn read_image_data(&mut self) -> Result<Image> {
         if self.bits_per_pixel_plane.unwrap() != PcxBitsPerPixelPlane::Bits8 {
             bail!("Only 8 bits per pixel plane are supported");
         }
@@ -286,8 +287,12 @@ impl<'a> PcxDecoder<'a> {
             })
             .collect();
 
-        let texture = Texture::new(
-            Extent3d::new(self.width as u32, self.height as u32, 1),
+        let texture = Image::new(
+            Extent3d {
+                width: self.width as u32,
+                height: self.height as u32,
+                depth_or_array_layers: 1,
+            },
             TextureDimension::D2,
             image_data,
             TextureFormat::Rgba8UnormSrgb,

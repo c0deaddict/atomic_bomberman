@@ -11,10 +11,11 @@ use bevy::prelude::*;
 #[derive(Default)]
 pub struct GamePlugin;
 
+#[derive(Component)]
 pub struct PlayerPosText;
 
 impl Plugin for GamePlugin {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.add_plugin(AnimatedSpritePlugin)
             .add_plugin(GridPlugin)
             .add_plugin(PlayerPlugin)
@@ -41,7 +42,7 @@ fn setup(
 
     let background_handle = asset_server.load("data/RES/FIELD0.PCX");
     commands.spawn_bundle(SpriteBundle {
-        material: materials.add(background_handle.into()),
+        texture: background_handle,
         transform: Transform::from_translation(Vec3::new(320., -240., 10.)),
         ..Default::default()
     });
@@ -145,8 +146,8 @@ fn cleanup() {
 
 fn player_pos_text(
     mut queries: QuerySet<(
-        Query<&mut Text, With<PlayerPosText>>,
-        Query<&Position, With<Player>>,
+        QueryState<&mut Text, With<PlayerPosText>>,
+        QueryState<&Position, With<Player>>,
     )>,
 ) {
     let mut p = Position { x: 0, y: 0 };
@@ -154,7 +155,7 @@ fn player_pos_text(
         p = *pos
     }
 
-    for mut text in queries.q0_mut().iter_mut() {
+    for mut text in queries.q0().iter_mut() {
         text.sections[0].value = format!("{}x{}", p.x, p.y);
     }
 }

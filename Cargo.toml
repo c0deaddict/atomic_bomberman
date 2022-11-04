@@ -2,11 +2,11 @@
 name = "atomic_bomberman"
 version = "0.1.0"
 authors = ["Jos van Bakel <jos@codeaddict.org>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = { version = "0.5", features = ["wav"] }
+bevy = { version = "0.6", features = ["wav", "wayland"] }
 anyhow = "1"
 byteorder = "1"

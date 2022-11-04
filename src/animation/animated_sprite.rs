@@ -10,7 +10,7 @@ struct AnimationTimer(Timer);
 const ANIMATION_FPS: f32 = 25.;
 
 impl Plugin for AnimatedSpritePlugin {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.insert_resource(AnimationTimer(Timer::from_seconds(
             1. / ANIMATION_FPS,
             true,
@@ -19,6 +19,7 @@ impl Plugin for AnimatedSpritePlugin {
     }
 }
 
+#[derive(Component)]
 pub struct AnimatedSprite {
     pub animation: Handle<Animation>,
     pub index: usize,
@@ -46,7 +47,7 @@ impl AnimatedSpriteBundle {
         AnimatedSpriteBundle {
             sprite_sheet: SpriteSheetBundle {
                 texture_atlas: asset.atlas.texture.clone(),
-                sprite: TextureAtlasSprite::new(asset.frames[0].index as u32),
+                sprite: TextureAtlasSprite::new(asset.frames[0].index),
                 transform,
                 ..Default::default()
             },
@@ -70,9 +71,7 @@ fn animate_sprite(
             let animation = animation_assets.get(&animate_sprite.animation).unwrap();
             if animation.frames.len() > 1 {
                 animate_sprite.index = (animate_sprite.index + 1) % animation.frames.len();
-                sprite.index = animation.frames[animate_sprite.index].index as u32;
-                // transform.translation.x = animation.frames[animate_sprite.index].offset_x as f32;
-                // transform.translation.y = animation.frames[animate_sprite.index].offset_y as f32;
+                sprite.index = animation.frames[animate_sprite.index].index;
             }
         }
     }

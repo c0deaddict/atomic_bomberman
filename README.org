@@ -1,3 +1,4 @@
+
 * Atomic Bomberman in Rust
 
 * Prior art

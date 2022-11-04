@@ -5,7 +5,7 @@ use bevy::window::WindowResized;
 pub struct WindowPlugin;
 
 impl Plugin for WindowPlugin {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.insert_resource(WindowDescriptor {
             title: "Atomic Bomberman".to_string(),
             width: 640. * 2.,
@@ -18,6 +18,7 @@ impl Plugin for WindowPlugin {
     }
 }
 
+#[derive(Component)]
 pub struct WindowTransform;
 
 fn setup(mut commands: Commands) {

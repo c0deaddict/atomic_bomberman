@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use bevy::{
     asset::{AssetLoader, LoadContext, LoadedAsset},
+    ecs::component::Component,
     reflect::TypeUuid,
     utils::BoxedFuture,
 };
@@ -28,7 +29,7 @@ pub enum Powerup {
     Random = 12,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Component, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Cell {
     Solid,
     Brick,

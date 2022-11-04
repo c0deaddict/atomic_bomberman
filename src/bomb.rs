@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 pub struct BombPlugin;
 
 impl Plugin for BombPlugin {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.add_event::<PlaceBombEvent>().add_system_set(
             SystemSet::on_update(AppState::Game)
                 .with_system(place_bomb.system())
@@ -22,9 +22,13 @@ impl Plugin for BombPlugin {
     }
 }
 
+#[derive(Component)]
 pub struct Flame;
+#[derive(Component)]
 pub struct Bomb;
+#[derive(Component)]
 pub struct PlaceBombEvent(pub Position);
+#[derive(Component)]
 pub struct FlameBrick;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

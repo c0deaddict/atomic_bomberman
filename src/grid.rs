@@ -1,4 +1,3 @@
-use crate::state::*;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::{math::const_vec2, prelude::*};
 use std::cmp::{Eq, PartialEq};
@@ -10,7 +9,7 @@ use self::Direction::*;
 pub struct GridPlugin;
 
 impl Plugin for GridPlugin {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.add_system_set_to_stage(
             CoreStage::PostUpdate,
             SystemSet::new().with_system(position_translation.system()),
@@ -20,7 +19,7 @@ impl Plugin for GridPlugin {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
+#[derive(Component, Copy, Clone, PartialEq, Eq, Debug, Hash)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
@@ -40,10 +39,13 @@ pub enum Direction {
     West,
 }
 
+#[derive(Component)]
 pub struct Offset(pub Vec3);
 
+#[derive(Component)]
 pub struct SnapToGrid;
 
+#[derive(Component)]
 pub struct DebugGrid;
 
 pub const WIDTH: i32 = 15;
@@ -65,7 +67,7 @@ impl From<Vec2> for Position {
         let v = (v - GRID_OFFSET) / CELL_DIMENSION;
         Position {
             x: if v.x < 0.0 { -1 } else { v.x as i32 },
-            y: if v.y < 0.0 { -1 } else { v.y as i32},
+            y: if v.y < 0.0 { -1 } else { v.y as i32 },
         }
     }
 }
@@ -143,22 +145,22 @@ impl Direction {
 
 fn setup(mut commands: Commands, mut materials: ResMut<Assets<ColorMaterial>>) {
     // Draw a debug grid over the screen.
-    let blue = materials.add(Color::rgb(0.0, 0.0, 1.0).into());
+    let blue = Color::rgb(0.0, 0.0, 1.0).into();
 
     for x in 0..16 {
         commands
             .spawn_bundle(SpriteBundle {
-                material: blue.clone(),
-                sprite: Sprite::new(Vec2::new(1.0, 480.0)),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(1.0, 480.0)),
+                    color: blue,
+                    ..Default::default()
+                },
                 transform: Transform::from_translation(Vec3::new(
                     20.0 + (x as f32) * 40.0,
                     -240.0,
                     50.0,
                 )),
-                visible: Visible {
-                    is_transparent: true,
-                    is_visible: false,
-                },
+                visibility: Visibility { is_visible: false },
                 ..Default::default()
             })
             .insert(DebugGrid);
@@ -167,17 +169,17 @@ fn setup(mut commands: Commands, mut materials: ResMut<Assets<ColorMaterial>>) {
     for y in 0..12 {
         commands
             .spawn_bundle(SpriteBundle {
-                material: blue.clone(),
-                sprite: Sprite::new(Vec2::new(640.0, 1.0)),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(640.0, 1.0)),
+                    color: blue,
+                    ..Default::default()
+                },
                 transform: Transform::from_translation(Vec3::new(
                     320.0,
                     -64.0 + (y as f32) * -36.0,
                     50.0,
                 )),
-                visible: Visible {
-                    is_transparent: true,
-                    is_visible: false,
-                },
+                visibility: Visibility { is_visible: false },
                 ..Default::default()
             })
             .insert(DebugGrid);
@@ -186,7 +188,7 @@ fn setup(mut commands: Commands, mut materials: ResMut<Assets<ColorMaterial>>) {
 
 fn keyboard_handling(
     mut keyboard_events: EventReader<KeyboardInput>,
-    mut query: Query<&mut Visible, With<DebugGrid>>,
+    mut query: Query<&mut Visibility, With<DebugGrid>>,
 ) {
     let mut visible: Option<bool> = None;
 

@@ -10,19 +10,19 @@ use std::path::Path;
 pub struct LoadingPlugin;
 
 impl Plugin for LoadingPlugin {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.add_plugin(CustomAssetLoaders)
             .init_resource::<AssetsLoading>()
             .init_resource::<NamedAssets>()
-            .add_system_set(SystemSet::on_enter(AppState::Loading)
-                            .with_system(setup.system()))
-            .add_system_set(SystemSet::on_update(AppState::Loading)
-                            .with_system(load_animations.system())
-                            .with_system(load_sounds.system())
-                            .with_system(load_schemes.system())
-                            .with_system(loading_progress.system()))
-            .add_system_set(SystemSet::on_exit(AppState::Loading)
-                            .with_system(cleanup.system()));
+            .add_system_set(SystemSet::on_enter(AppState::Loading).with_system(setup.system()))
+            .add_system_set(
+                SystemSet::on_update(AppState::Loading)
+                    .with_system(load_animations.system())
+                    .with_system(load_sounds.system())
+                    .with_system(load_schemes.system())
+                    .with_system(loading_progress.system()),
+            )
+            .add_system_set(SystemSet::on_exit(AppState::Loading).with_system(cleanup.system()));
     }
 }
 
@@ -270,6 +270,7 @@ struct AssetsLoading {
     initial_count: usize,
 }
 
+#[derive(Component)]
 struct LoadingText;
 
 struct LoadingScreen {
@@ -287,7 +288,7 @@ fn setup(
 
     let entity = commands
         .spawn_bundle(SpriteBundle {
-            material: materials.add(background_handle.into()),
+            texture: background_handle,
             transform: Transform::from_translation(Vec3::new(320., -240., 0.)),
             ..Default::default()
         })
@@ -301,9 +302,9 @@ fn setup(
                             font_size: 40.0,
                             color: Color::WHITE,
                         },
-                         TextAlignment {
-                                vertical: VerticalAlign::Center,
-                                horizontal: HorizontalAlign::Center,
+                        TextAlignment {
+                            vertical: VerticalAlign::Center,
+                            horizontal: HorizontalAlign::Center,
                         },
                     ),
                     transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
@@ -315,6 +316,15 @@ fn setup(
 
     commands.insert_resource(LoadingScreen { entity });
 
+    let color_palette: Handle<ColorPalette> = asset_server.load("data/COLOR.PAL");
+    println!("{:?}", color_palette);
+    let mut color_remap_tables: Vec<Handle<ColorRemapTable>> = vec![];
+    for i in 0..10 {
+        let path = format!("data/{}.RMP", i);
+        color_remap_tables.push(asset_server.load(path.as_str()));
+    }
+
+    // TODO: pass color_palette and color_remap_tables to animations.
     for filename in ANIMATION_LIST {
         let path = "data/ANI/".to_owned() + filename;
         assets_loading

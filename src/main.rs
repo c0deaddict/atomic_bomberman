@@ -4,6 +4,17 @@ use bevy::{
     prelude::*,
 };
 
+// TODO: use https://bevy-cheatbook.github.io/features/audio.html
+// TODO: https://bevy-cheatbook.github.io/features/fixed-timestep.html
+
+// TODO: Generate animations based on color.pal (other asset)
+// Could listen to AssetEvent to wait for palette resource to be loaded.
+// How to pass data to AssetLoaders?
+//
+// https://github.com/bevyengine/bevy/pull/1665
+// https://github.com/bevyengine/bevy/pull/1393
+// https://github.com/bevyengine/bevy/discussions/1307
+
 // COLOR.PAL: (= palette)
 // 256 RGB colors (768 bytes).
 // 2^15 indices (1 byte) into color table (32768 bytes)
@@ -26,9 +37,8 @@ use bevy::{
 // 9 = orange
 // 10 = purple
 
-
 fn main() {
-    App::build()
+    App::new()
         .add_state(AppState::Loading)
         .insert_resource(bevy::log::LogSettings {
             level: bevy::log::Level::INFO,
@@ -45,6 +55,7 @@ fn main() {
         .run();
 }
 
+#[derive(Component)]
 struct FpsText;
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {

@@ -1,12 +1,33 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use bevy::{
     asset::{AssetLoader, LoadContext, LoadedAsset},
-    render::texture::{Extent3d, Texture, TextureDimension, TextureFormat},
+    reflect::TypeUuid,
     utils::BoxedFuture,
 };
 
 #[derive(Default)]
 pub struct ColorPaletteAssetLoader;
+
+const PALETTE_SIZE: usize = 256 * 3 + 32768; // 256 RGB colors + 2^15 mapping.
+
+#[derive(Default, TypeUuid)]
+#[uuid = "398f6778-81f8-4293-a3b9-3b72ba4b5b55"]
+pub struct ColorPalette {
+    data: Vec<u8>,
+}
+
+impl ColorPalette {
+    fn new(bytes: &[u8]) -> Result<ColorPalette> {
+        if bytes.len() != PALETTE_SIZE {
+            bail!(
+                "Expected color palette to be exactly {} bytes",
+                PALETTE_SIZE
+            );
+        }
+
+        Ok(ColorPalette { data: bytes.into() })
+    }
+}
 
 impl AssetLoader for ColorPaletteAssetLoader {
     fn load<'a>(
@@ -15,33 +36,8 @@ impl AssetLoader for ColorPaletteAssetLoader {
         load_context: &'a mut LoadContext,
     ) -> BoxedFuture<'a, Result<()>> {
         Box::pin(async move {
-            let rmp = std::fs::read("/home/jos/tmp/BM95/6.RMP").unwrap();
-
-            let width = 128;
-            let height = 256;
-            let mut image_data = vec![0; 4 * width * height];
-            for i in 0..width * height {
-                let idx = rmp[bytes[i + 768] as usize] as usize;
-                let r = bytes[idx * 3 + 0] << 2;
-                let g = bytes[idx * 3 + 1] << 2;
-                let b = bytes[idx * 3 + 2] << 2;
-                if i == 0x3e0 || i == 0x2a0 {
-                    println!("{:04x}: {:02x}{:02x}{:02x}", i, r, g, b);
-                }
-                image_data[i * 4 + 0] = r;
-                image_data[i * 4 + 1] = g;
-                image_data[i * 4 + 2] = b;
-                image_data[i * 4 + 3] = 255;
-            }
-
-            let texture = Texture::new(
-                Extent3d::new(width as u32, height as u32, 1),
-                TextureDimension::D2,
-                image_data,
-                TextureFormat::Rgba8UnormSrgb,
-            );
-
-            load_context.set_default_asset(LoadedAsset::new(texture));
+            let palette = ColorPalette::new(bytes)?;
+            load_context.set_default_asset(LoadedAsset::new(palette));
             Ok(())
         })
     }

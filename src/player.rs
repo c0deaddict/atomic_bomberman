@@ -13,7 +13,7 @@ use std::fmt::Debug;
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.add_system_set(
             SystemSet::on_update(AppState::Game)
                 .with_system(keyboard_handling.system())
@@ -23,15 +23,16 @@ impl Plugin for PlayerPlugin {
     }
 }
 
+#[derive(Component)]
 pub struct Player;
 
-#[derive(Debug)]
+#[derive(Component, Debug)]
 pub struct PlayerDirection {
     pub direction: Direction,
     pub walking: bool,
 }
 
-#[derive(Default)]
+#[derive(Component, Default)]
 pub struct KeyboardMovement(Vec<Direction>);
 
 impl PlayerDirection {
@@ -98,8 +99,8 @@ fn keyboard_handling(
 fn player_movement(
     time: Res<Time>,
     mut queries: QuerySet<(
-        Query<(&mut Timer, &mut Transform, &mut Position, &PlayerDirection)>,
-        Query<(&Cell, &Position)>,
+        QueryState<(&mut Timer, &mut Transform, &mut Position, &PlayerDirection)>,
+        QueryState<(&Cell, &Position)>,
     )>,
 ) {
     let occupied: HashSet<Position> = queries
@@ -109,7 +110,7 @@ fn player_movement(
         .map(|(_cell, pos)| *pos)
         .collect();
 
-    for (mut timer, mut transform, mut pos, player_direction) in queries.q0_mut().iter_mut() {
+    for (mut timer, mut transform, mut pos, player_direction) in queries.q0().iter_mut() {
         timer.tick(time.delta());
         if timer.finished() && player_direction.walking {
             let mut new_translation = transform.translation;
@@ -120,7 +121,7 @@ fn player_movement(
                 Direction::North => new_translation.y += 2.,
             };
 
-            let new_pos = Position::from(Vec2::from(new_translation));
+            let new_pos = Position::from(new_translation.truncate());
 
             let collision = occupied.contains(&new_pos);
 

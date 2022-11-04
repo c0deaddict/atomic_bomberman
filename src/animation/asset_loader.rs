@@ -3,7 +3,8 @@ use bevy::{
     asset::{AssetLoader, Handle, LoadContext, LoadedAsset},
     prelude::*,
     reflect::TypeUuid,
-    render::texture::{Extent3d, TextureDimension, TextureFormat},
+    render::render_resource::{Extent3d, TextureDimension, TextureFormat},
+    render::texture::Image,
     utils::BoxedFuture,
 };
 use byteorder::{ReadBytesExt, LE};
@@ -550,8 +551,12 @@ impl<'a> Decoder<'a> {
             })
             .collect();
 
-        let texture = Texture::new(
-            Extent3d::new(tile_width, tile_height * tile_count as u32, 1),
+        let texture = Image::new(
+            Extent3d {
+                width: tile_width,
+                height: tile_height * tile_count as u32,
+                depth_or_array_layers: 1,
+            },
             TextureDimension::D2,
             image_data,
             TextureFormat::Rgba8UnormSrgb,
