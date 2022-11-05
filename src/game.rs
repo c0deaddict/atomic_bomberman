@@ -20,11 +20,11 @@ impl Plugin for GamePlugin {
             .add_plugin(GridPlugin)
             .add_plugin(PlayerPlugin)
             .add_plugin(BombPlugin)
-            .add_system_set(SystemSet::on_enter(AppState::Game).with_system(setup.system()))
+            .add_system_set(SystemSet::on_enter(AppState::Game).with_system(setup))
             .add_system_set(
-                SystemSet::on_update(AppState::Game).with_system(player_pos_text.system()),
+                SystemSet::on_update(AppState::Game).with_system(player_pos_text),
             )
-            .add_system_set(SystemSet::on_exit(AppState::Game).with_system(cleanup.system()));
+            .add_system_set(SystemSet::on_exit(AppState::Game).with_system(cleanup));
     }
 }
 
@@ -70,7 +70,7 @@ fn setup(
         .insert(player_direction)
         .insert(KeyboardMovement::default())
         .insert(start_pos)
-        .insert(Timer::from_seconds(1. / 60., true))
+        .insert(PlayerSpeed{ timer: Timer::from_seconds(1. / 60., true)})
         .with_children(|parent| {
             let shadow = named_assets.animations.get("shadow").unwrap();
 
@@ -145,17 +145,17 @@ fn cleanup() {
 }
 
 fn player_pos_text(
-    mut queries: QuerySet<(
-        QueryState<&mut Text, With<PlayerPosText>>,
-        QueryState<&Position, With<Player>>,
+    mut queries: ParamSet<(
+        Query<&mut Text, With<PlayerPosText>>,
+        Query<&Position, With<Player>>,
     )>,
 ) {
     let mut p = Position { x: 0, y: 0 };
-    for pos in queries.q1().iter() {
+    for pos in queries.p1().iter() {
         p = *pos
     }
 
-    for mut text in queries.q0().iter_mut() {
+    for mut text in queries.p0().iter_mut() {
         text.sections[0].value = format!("{}x{}", p.x, p.y);
     }
 }

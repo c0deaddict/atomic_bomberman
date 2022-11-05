@@ -15,7 +15,7 @@ impl Plugin for AnimatedSpritePlugin {
             1. / ANIMATION_FPS,
             true,
         )))
-        .add_system(animate_sprite.system());
+        .add_system(animate_sprite);
     }
 }
 

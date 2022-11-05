@@ -49,9 +49,9 @@ fn main() {
         .add_plugin(FrameTimeDiagnosticsPlugin)
         .add_plugin(LoadingPlugin)
         .add_plugin(GamePlugin)
-        .add_startup_system(setup.system())
-        .add_system(fps_counter_system.system())
-        .add_system(bevy::input::system::exit_on_esc_system.system())
+        .add_startup_system(setup)
+        .add_system(fps_counter_system)
+        .add_system(bevy::input::system::exit_on_esc_system)
         .run();
 }
 

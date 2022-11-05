@@ -14,10 +14,10 @@ impl Plugin for BombPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<PlaceBombEvent>().add_system_set(
             SystemSet::on_update(AppState::Game)
-                .with_system(place_bomb.system())
-                .with_system(trigger_bomb.system())
-                .with_system(flame_out.system())
-                .with_system(flame_brick_out.system()),
+                .with_system(place_bomb)
+                .with_system(trigger_bomb)
+                .with_system(flame_out)
+                .with_system(flame_brick_out),
         );
     }
 }
@@ -30,6 +30,11 @@ pub struct Bomb;
 pub struct PlaceBombEvent(pub Position);
 #[derive(Component)]
 pub struct FlameBrick;
+
+#[derive(Component)]
+struct BombTimer{
+    timer: Timer
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FlameCell {
@@ -68,7 +73,7 @@ fn place_bomb(
                 .insert(event.0)
                 .insert(Offset(Vec3::from((offset, 25.0))))
                 .insert(SnapToGrid)
-                .insert(Timer::from_seconds(3.0, false));
+                .insert(BombTimer{ timer: Timer::from_seconds(3.0, false) });
 
             let handle = named_assets.sounds.get("bmdrop2").unwrap();
             audio.play(handle.clone());
@@ -81,7 +86,7 @@ fn trigger_bomb(
     named_assets: Res<NamedAssets>,
     animation_assets: Res<Assets<Animation>>,
     time: Res<Time>,
-    mut query: Query<(Entity, &Position, &mut Timer), With<Bomb>>,
+    mut query: Query<(Entity, &Position, &mut BombTimer), With<Bomb>>,
     grid: Query<(&Position, Entity, &Cell)>,
     audio: Res<Audio>,
 ) {
@@ -93,8 +98,8 @@ fn trigger_bomb(
     let mut bombs: HashSet<Position> = HashSet::new();
     let mut new_bombs: Vec<Position> = vec![];
     for (entity, pos, mut timer) in query.iter_mut() {
-        timer.tick(time.delta());
-        if timer.finished() {
+        timer.timer.tick(time.delta());
+        if timer.timer.finished() {
             bombs.insert(*pos);
             new_bombs.push(*pos);
             commands.entity(entity).despawn_recursive();
@@ -130,7 +135,7 @@ fn trigger_bomb(
                 .insert(Offset(Vec3::new(0.0, 0.0, 25.0)))
                 .insert(SnapToGrid)
                 .insert(FlameBrick)
-                .insert(Timer::from_seconds(0.25, false));
+                .insert(BombTimer{timer: Timer::from_seconds(0.25, false)});
 
             // TODO: trigger event? spawn potential upgrades?
         }
@@ -162,7 +167,7 @@ fn trigger_bomb(
     let flame_entity = commands
         .spawn_bundle((Transform::default(), GlobalTransform::default()))
         .insert(Flame)
-        .insert(Timer::from_seconds(0.75, false))
+        .insert(BombTimer{timer: Timer::from_seconds(0.75, false)})
         .id();
 
     for (pos, cell) in flame.iter() {
@@ -228,11 +233,11 @@ fn trace_flame(
 fn flame_out(
     mut commands: Commands,
     time: Res<Time>,
-    mut query: Query<(Entity, &mut Timer), With<Flame>>,
+    mut query: Query<(Entity, &mut BombTimer), With<Flame>>,
 ) {
     for (entity, mut timer) in query.iter_mut() {
-        timer.tick(time.delta());
-        if timer.finished() {
+        timer.timer.tick(time.delta());
+        if timer.timer.finished() {
             commands.entity(entity).despawn_recursive();
         }
     }
@@ -241,11 +246,11 @@ fn flame_out(
 fn flame_brick_out(
     mut commands: Commands,
     time: Res<Time>,
-    mut query: Query<(Entity, &mut Timer), With<FlameBrick>>,
+    mut query: Query<(Entity, &mut BombTimer), With<FlameBrick>>,
 ) {
     for (entity, mut timer) in query.iter_mut() {
-        timer.tick(time.delta());
-        if timer.finished() {
+        timer.timer.tick(time.delta());
+        if timer.timer.finished() {
             commands.entity(entity).despawn_recursive();
         }
     }

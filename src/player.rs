@@ -16,15 +16,20 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_system_set(
             SystemSet::on_update(AppState::Game)
-                .with_system(keyboard_handling.system())
-                .with_system(player_movement.system())
-                .with_system(change_sprite.system()),
+                .with_system(keyboard_handling)
+                .with_system(player_movement)
+                .with_system(change_sprite),
         );
     }
 }
 
 #[derive(Component)]
 pub struct Player;
+
+#[derive(Component)]
+pub struct PlayerSpeed{
+    pub timer: Timer
+}
 
 #[derive(Component, Debug)]
 pub struct PlayerDirection {
@@ -98,21 +103,21 @@ fn keyboard_handling(
 
 fn player_movement(
     time: Res<Time>,
-    mut queries: QuerySet<(
-        QueryState<(&mut Timer, &mut Transform, &mut Position, &PlayerDirection)>,
-        QueryState<(&Cell, &Position)>,
+    mut queries: ParamSet<(
+        Query<(&mut PlayerSpeed, &mut Transform, &mut Position, &PlayerDirection)>,
+        Query<(&Cell, &Position)>,
     )>,
 ) {
     let occupied: HashSet<Position> = queries
-        .q1()
+        .p1()
         .iter()
         .filter(|(cell, _pos)| cell != &&Cell::Blank)
         .map(|(_cell, pos)| *pos)
         .collect();
 
-    for (mut timer, mut transform, mut pos, player_direction) in queries.q0().iter_mut() {
-        timer.tick(time.delta());
-        if timer.finished() && player_direction.walking {
+    for (mut timer, mut transform, mut pos, player_direction) in queries.p0().iter_mut() {
+        timer.timer.tick(time.delta());
+        if timer.timer.finished() && player_direction.walking {
             let mut new_translation = transform.translation;
             match player_direction.direction {
                 Direction::West => new_translation.x -= 2.,

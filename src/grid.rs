@@ -12,10 +12,10 @@ impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
         app.add_system_set_to_stage(
             CoreStage::PostUpdate,
-            SystemSet::new().with_system(position_translation.system()),
+            SystemSet::new().with_system(position_translation),
         )
-        .add_startup_system(setup.system())
-        .add_system(keyboard_handling.system());
+        .add_startup_system(setup)
+        .add_system(keyboard_handling);
     }
 }
 

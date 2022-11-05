@@ -14,15 +14,15 @@ impl Plugin for LoadingPlugin {
         app.add_plugin(CustomAssetLoaders)
             .init_resource::<AssetsLoading>()
             .init_resource::<NamedAssets>()
-            .add_system_set(SystemSet::on_enter(AppState::Loading).with_system(setup.system()))
+            .add_system_set(SystemSet::on_enter(AppState::Loading).with_system(setup))
             .add_system_set(
                 SystemSet::on_update(AppState::Loading)
-                    .with_system(load_animations.system())
-                    .with_system(load_sounds.system())
-                    .with_system(load_schemes.system())
-                    .with_system(loading_progress.system()),
+                    .with_system(load_animations)
+                    .with_system(load_sounds)
+                    .with_system(load_schemes)
+                    .with_system(loading_progress),
             )
-            .add_system_set(SystemSet::on_exit(AppState::Loading).with_system(cleanup.system()));
+            .add_system_set(SystemSet::on_exit(AppState::Loading).with_system(cleanup));
     }
 }
 
